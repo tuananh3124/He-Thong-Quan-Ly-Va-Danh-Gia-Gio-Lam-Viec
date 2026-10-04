@@ -6,11 +6,11 @@
   "scripts": {
     "dev": "pnpm -r --parallel dev",
     "build": "turbo run build",
-    "build:api": "turbo run build --filter=@projectname/api",
+    "build:backend": "turbo run build --filter=@projectname/backend",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prisma:push": "turbo run prisma:push --filter=@projectname/api",
-    "prisma:seed": "turbo run prisma:seed --filter=@projectname/api"
+    "prisma:push": "turbo run prisma:push --filter=@projectname/backend",
+    "prisma:seed": "turbo run prisma:seed --filter=@projectname/backend"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.54.0",

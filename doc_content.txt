@@ -1,0 +1,46 @@
+THIẾT KẾ SƠ BỘ HỆ THỐNG
+QUẢN LÝ VÀ ĐÁNH GIÁ GIỜ LÀM VIỆC TIÊU CHUẨN
+CỦA GIẢNG VIÊN VÀ NGHIÊN CỨU VIÊN
+Công nghệ – Actor – API/Hàm – Cơ sở dữ liệu
+1. Tổng quan đề tài
+Mục tiêu: hỗ trợ giảng viên và nghiên cứu viên kê khai hoạt động giảng dạy, nghiên cứu khoa học và chuyển giao tri thức; quản lý minh chứng; AI hỗ trợ phân loại tài liệu; tự động áp dụng quy định để quy đổi thành giờ làm việc/giờ chuẩn; quản lý kiểm tra, phê duyệt và đánh giá mức độ hoàn thành.
+Nguyên tắc: AI chỉ phân loại/trích xuất và đề xuất. Số giờ chính thức do Rule Engine tính dựa trên ConversionRules đã cấu hình.
+2. Công nghệ sử dụng
+3. Kiến trúc xử lý
+React → NestJS → PostgreSQL/Storage. NestJS gọi FastAPI khi cần AI. FastAPI: PDF → PyMuPDF → RAG → LLM API → kết quả phân loại → NestJS. Sau khi người dùng kiểm tra kết quả AI, NestJS dùng Rule Engine để tính giờ.
+AI không quyết định giờ. Rule Engine mới là thành phần quyết định số giờ dựa trên loại hoạt động, xếp loại nguồn công bố, điều kiện và năm học.
+4. Bốn Actor
+5. Giảng viên – công nghệ và hàm/API
+6. Nghiên cứu viên – công nghệ và hàm/API
+7. Quản lý – công nghệ và hàm/API
+8. Quản trị viên – công nghệ và hàm/API
+9. Cơ sở dữ liệu
+Thiết kế cần tách dữ liệu kê khai khỏi quy định để sau này thay đổi định mức mà không phải sửa code. Đặc biệt phải quản lý được nguồn đăng bài, xếp loại nguồn và tác giả chính/cộng tác viên.
+10. Luồng bài nghiên cứu có nguồn/xếp loại/tác giả
+1) Người dùng tải PDF bài nghiên cứu.
+2) FastAPI + PyMuPDF đọc nội dung và metadata.
+3) RAG truy xuất quy định/danh mục liên quan.
+4) LLM đề xuất tên bài, tác giả, tạp chí/hội thảo, năm, loại công bố và confidence.
+5) Hệ thống đối chiếu PublicationSources và PublicationClassifications.
+6) Người dùng kiểm tra/sửa kết quả AI.
+7) Khai báo tác giả chính và cộng tác viên; nhập hoặc xác nhận tỷ lệ phân bổ.
+8) Rule Engine lấy ConversionRule phù hợp và tính giờ.
+9) Gửi Quản lý duyệt.
+10) Sau khi duyệt, giờ được đưa vào thống kê/đánh giá.
+11. Ví dụ phân bổ tác giả
+Ví dụ một sản phẩm có mức quy đổi 1.200 giờ, quy định phân bổ tác giả chính 50%, hai đồng tác giả 25% mỗi người. Hệ thống có thể lưu: tác giả chính 600 giờ; đồng tác giả 300 giờ; đồng tác giả 300 giờ. Tỷ lệ này nên lấy từ AuthorAllocationRules/ConversionRules thay vì hard-code.
+PublicationSources dùng để lưu tạp chí/hội thảo cụ thể; PublicationClassifications lưu nhóm xếp loại; ConversionRules lưu mức quy đổi. Nhờ vậy admin có thể cập nhật quy định mà không phải sửa dữ liệu các bài nghiên cứu đã khai báo.
+12. Nguyên tắc Rule Engine
+Không hard-code mức giờ ở frontend.
+ConversionRules phải chứa điều kiện và thời gian hiệu lực.
+Có thể gắn quy tắc với loại hoạt động, xếp loại nguồn và năm học.
+AI chỉ đề xuất; Rule Engine mới tính giờ chính thức.
+Nên lưu kết quả tính tại thời điểm kê khai/duyệt để bảo toàn lịch sử.
+Quy định mới nên có phiên bản hoặc thời gian hiệu lực.
+13. Lộ trình MVP
+14. Phân công công nghệ cho nhóm 2 người
+Thành viên 1: React, TypeScript, NestJS, PostgreSQL, Prisma, JWT/RBAC, Excel import, Rule Engine, dashboard.
+Thành viên 2: Python, FastAPI, PyMuPDF, RAG, LLM API, phân loại tài liệu và đánh giá kết quả AI.
+Hai thành viên thống nhất API contract giữa NestJS và FastAPI. Nên hoàn thiện luồng nghiệp vụ không có AI trước, sau đó mới tích hợp AI.
+15. Kết luận
+Thiết kế tách rõ dữ liệu/quy định, nghiệp vụ tính toán và AI hỗ trợ. NestJS là trung tâm nghiệp vụ; FastAPI là dịch vụ AI; PostgreSQL là CSDL chính. Việc bổ sung PublicationSources, PublicationClassifications và DeclarationAuthors giúp hệ thống xử lý đúng trường hợp bài nghiên cứu được đăng trên các nguồn có xếp loại khác nhau và có tác giả chính/cộng tác viên với tỷ lệ đóng góp khác nhau.

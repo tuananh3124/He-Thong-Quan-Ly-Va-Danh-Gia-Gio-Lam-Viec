@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client"
+  output   = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model tenants {
+  id           BigInt   @id @default(autoincrement())
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  businessName String   @unique()
+  users        users[]
+}
+
+model users {
+  id                 BigInt                @id @default(autoincrement())
+  createdAt          DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime              @default(now()) @updatedAt @db.Timestamptz(6)
+  role               String
+  name               String
+  email              String                @unique() @db.VarChar(254)
+  password           String
+  lastLoginAt        DateTime?
+  tenantId           BigInt?
+  tenant             tenants?              @relation(fields: [tenantId], references: [id])
+  
+  academicTitle      String?
+  degree             String?
+  managementRole     String?
+
+  declarations       declarations[]
+  declarationAuthors declaration_authors[]
+}
+
+model working_hour_norms {
+  id                BigInt   @id @default(autoincrement())
+  academicTitle     String
+  degree            String
+  teachingHoursNorm Float
+  researchHoursNorm Float
+  totalHoursNorm    Float
+}
+
+model academic_years {
+  id              BigInt             @id @default(autoincrement())
+  name            String
+  startDate       DateTime
+  endDate         DateTime
+  isActive        Boolean            @default(true)
+  declarations    declarations[]
+  conversionRules conversion_rules[]
+}
+
+model publication_classifications {
+  id              BigInt                @id @default(autoincrement())
+  name            String
+  description     String?
+  sources         publication_sources[]
+  conversionRules conversion_rules[]
+}
+
+model publication_sources {
+  id               BigInt                      @id @default(autoincrement())
+  name             String
+  classificationId BigInt
+  classification   publication_classifications @relation(fields: [classificationId], references: [id])
+  declarations     declarations[]
+}
+
+model conversion_rules {
+  id               BigInt                       @id @default(autoincrement())
+  activityType     String
+  classificationId BigInt?
+  classification   publication_classifications? @relation(fields: [classificationId], references: [id])
+  academicYearId   BigInt?
+  academicYear     academic_years?              @relation(fields: [academicYearId], references: [id])
+  hours            Float
+  conditions       String?
+  effectiveFrom    DateTime?
+  effectiveTo      DateTime?
+}
+
+model author_allocation_rules {
+  id          BigInt  @id @default(autoincrement())
+  roleType    String
+  percentage  Float
+  description String?
+}
+
+model declarations {
+  id              BigInt                @id @default(autoincrement())
+  userId          BigInt
+  user            users                 @relation(fields: [userId], references: [id])
+  academicYearId  BigInt
+  academicYear    academic_years        @relation(fields: [academicYearId], references: [id])
+  activityType    String
+  name            String
+  url             String?
+  sourceId        BigInt?
+  source          publication_sources?  @relation(fields: [sourceId], references: [id])
+  status          String
+  aiConfidence    Float?
+  calculatedHours Float?
+  createdAt       DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime              @default(now()) @updatedAt @db.Timestamptz(6)
+  authors         declaration_authors[]
+}
+
+model declaration_authors {
+  id             BigInt       @id @default(autoincrement())
+  declarationId  BigInt
+  declaration    declarations @relation(fields: [declarationId], references: [id])
+  authorName     String
+  userId         BigInt?
+  user           users?       @relation(fields: [userId], references: [id])
+  roleType       String
+  allocatedHours Float?
+}

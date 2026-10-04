@@ -1,115 +1,78 @@
-# ProjectName
+# Hệ thống Quản lý & Đánh giá giờ làm việc tiêu chuẩn
 
-![Snipaste_2026-02-04_14-07-12.png](https://s2.loli.net/2026/02/04/uIe3QOlHAwVnkYh.png)
+Dự án Hệ thống quản lý và đánh giá giờ làm việc tiêu chuẩn của Giảng viên và Nghiên cứu viên, được thiết kế theo cấu trúc Monorepo, quản lý bằng [Turborepo](https://turbo.build/) và [pnpm workspaces](https://pnpm.io/workspaces). Hệ thống tích hợp Trí tuệ Nhân tạo (AI) giúp tự động trích xuất thông tin minh chứng và Rule Engine để quy đổi giờ làm việc.
 
-ProjectName is a full-stack project solution built as a monorepo using [Turborepo](https://turbo.build/) and [pnpm workspaces](https://pnpm.io/workspaces). It features a modern React-based frontend and a robust NestJS backend.
+## 🚀 Công nghệ sử dụng (Tech Stack)
 
-## 🚀 Tech Stack
-
-### Frontend (@projectname/app)
-
+### 1. Frontend (`frontend` - `@projectname/frontend`)
 - **Framework:** React 19
 - **Build Tool:** Vite 7
 - **UI Library:** Ant Design 6
-- **Routing:** React Router v7
 - **State Management:** Zustand
-- **HTTP Client:** Axios
+- **Vai trò:** Giao diện cho Giảng viên, Nghiên cứu viên khai báo thông tin, nộp minh chứng (PDF/Link). Cung cấp Dashboard cho Quản lý phê duyệt.
 
-### Backend (@projectname/api)
-
+### 2. Backend (`backend` - `@projectname/backend`)
 - **Framework:** NestJS
 - **Database ORM:** Prisma
 - **Database:** PostgreSQL
-- **Caching/Queue:** Redis
-- **Authentication:** Passport (JWT)
-- **Documentation:** Swagger / OpenAPI
+- **Vai trò:** Máy chủ nghiệp vụ chính, quản lý người dùng, phân quyền (RBAC), lưu trữ cấu hình quy định (Quy đổi giờ, tỷ lệ phân bổ tác giả). Tích hợp **Rule Engine** để tự động tính toán giờ làm việc chính thức dựa trên kết quả AI đề xuất.
 
-### Shared (@projectname/shared)
+### 3. AI Service (`ai-service`)
+- **Framework:** FastAPI (Python)
+- **Công cụ:** PyMuPDF, RAG, LLM API
+- **Vai trò:** Xử lý file PDF minh chứng hoặc thu thập metadata từ Link (URL) bài báo. Trích xuất tự động tên bài, tác giả, nơi công bố và xếp loại tạp chí. AI chỉ đóng vai trò **đề xuất**, không tự ý quyết định số giờ.
 
-- Shared TypeScript types and constants between frontend and backend.
+### 4. Shared (`shared` - `@projectname/shared`)
+- **Vai trò:** Chứa các Type, Interface dùng chung giữa Frontend và Backend, đảm bảo tính đồng nhất dữ liệu (API Contracts).
 
-## 📂 Project Structure
+## 📂 Cấu trúc thư mục
 
 ```
 .
-├── api/                # Backend application (@projectname/api)
-├── app/                # Frontend application (@projectname/app)
-├── shared/             # Shared code library (@projectname/shared)
-├── docker-compose.yaml # Infrastructure configuration
-└── package.json        # Root configuration
+├── frontend/           # Giao diện người dùng (React/Vite)
+├── backend/            # Máy chủ nghiệp vụ trung tâm & Rule Engine (NestJS)
+├── ai-service/         # Dịch vụ trích xuất dữ liệu AI (FastAPI/Python)
+├── shared/             # Cấu trúc dữ liệu dùng chung (TypeScript)
+├── docker-compose.yaml # Cấu hình hạ tầng Database/Redis
+└── package.json        # Cấu hình Root Workspace
 ```
 
-## 🛠 Prerequisites
+## ⚙️ Luồng hoạt động chính (Pipeline)
 
-- [Node.js](https://nodejs.org/) (>= 22.0.0 recommended)
-- [pnpm](https://pnpm.io/) (Latest version)
-- [Docker](https://www.docker.com/) & Docker Compose
+1. **Upload Minh chứng:** Người dùng (Giảng viên/Nghiên cứu viên) nộp minh chứng bằng file PDF hoặc đường dẫn (URL) bài báo qua `frontend`.
+2. **AI Bóc tách:** `backend` tiếp nhận và gửi dữ liệu sang `ai-service`. AI sử dụng PyMuPDF đọc file hoặc Web Scraping/API lấy siêu dữ liệu từ Link URL, kết hợp LLM để đề xuất thông tin bài báo.
+3. **Đối chiếu & Tính giờ:** Kết quả AI trả về `backend`. Tại đây, **Rule Engine** tra cứu bảng quy định (`conversion_rules`, `working_hour_norms`) để quy đổi chính xác số giờ làm việc dựa trên hạng chức danh, số tác giả, và xếp loại nguồn công bố.
+4. **Phê duyệt:** Dữ liệu hoàn chỉnh hiện trên `frontend` để người dùng kiểm tra, xác nhận và nộp lên Quản lý phê duyệt.
 
-## 🏁 Getting Started
+## 🛠 Hướng dẫn cài đặt
 
-### 1. Installation
+### 1. Yêu cầu hệ thống
+- [Node.js](https://nodejs.org/) (>= 22.0.0)
+- [pnpm](https://pnpm.io/)
+- Python 3.10+ (Cho AI Service)
+- Docker & Docker Compose
 
-Clone the repository and install dependencies:
-
+### 2. Cài đặt & Khởi động Backend + Frontend
 ```bash
-git clone <repository-url>
-cd ProjectName
+# Cài đặt thư viện Node
 pnpm install
-```
 
-### 2. Init user project
-
-change all `projectname` to `yourprojectname`
-
-change all `ProjectName` to `YourProjectName`
-
-### 3. Environment Setup
-
-Configure environment variables for both applications.
-
-**Backend (@projectname/api):**
-Copy `api/.env.sample` to `api/.env` and update the values if necessary.
-
-**Frontend (@projectname/app):**
-Copy `app/.env.sample` to `app/.env` and update the values.
-
-### 4. Start Infrastructure
-
-Start PostgreSQL and Redis using Docker Compose:
-
-```bash
+# Khởi chạy Database (PostgreSQL & Redis)
 docker-compose up -d
-```
 
-### 5. Database Setup
-
-Initialize the database schema and seed data:
-
-```bash
-# Push schema to database
+# Cập nhật Database Schema
 pnpm prisma:push
 
-# Seed database with initial data
-pnpm prisma:seed
-```
-
-### 6. Running the Application
-
-Start both Frontend and Backend in development mode:
-
-```bash
+# Chạy hệ thống Backend và Frontend
 pnpm dev
 ```
 
-This will run:
-
-- **Frontend:** [http://localhost:5173](http://localhost:5173)
-- **Backend:** [http://localhost:3000](http://localhost:3000)
-- **API Documentation:** [http://localhost:3000/apidoc](http://localhost:3000/apidoc)
-
-## 📦 Scripts
-
-- `pnpm dev`: Start all applications in development mode.
-- `pnpm build`: Build all applications.
-- `pnpm format`: Format code using Prettier.
-
+### 3. Cài đặt AI Service (Python)
+```bash
+cd ai-service
+pip install -r requirements.txt
+# Copy và cấu hình file .env (nếu có)
+cp .env.example .env
+# Chạy server FastAPI
+python main.py
+```
