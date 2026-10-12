@@ -8,7 +8,7 @@ const { Title } = Typography;
 
 export const Banner = () => {
   const { collapsed } = useGlobal();
-  const { isAdmin } = useAuth()
+  const { isAdmin } = useAuth();
 
   return (
     <Flex
@@ -53,7 +53,7 @@ export const Banner = () => {
               margin: 0,
             }}
           >
-            {isAdmin ? 'Admin Portal' : 'ProjectName'}
+            {isAdmin ? 'Cổng quản trị' : 'Giờ chuẩn'}
           </Title>
         </div>
       </div>

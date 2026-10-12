@@ -3,3 +3,4 @@ export * from './Login';
 export * from './Products';
 export * from './Settings';
 export * from './HelpCenter';
+export * from './Declarations';

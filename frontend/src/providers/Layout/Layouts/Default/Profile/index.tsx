@@ -40,7 +40,7 @@ export const UserProfile = () => {
             key: '3',
             danger: true,
             title: '',
-            label: 'Log out',
+            label: 'Đăng xuất',
             onClick: () => {
               logout({
                 message: null,

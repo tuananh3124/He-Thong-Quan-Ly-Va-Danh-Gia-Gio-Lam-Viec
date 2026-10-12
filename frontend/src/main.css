@@ -7,6 +7,8 @@
 }
 
 body {
+  min-width: 320px;
+  background: #f4f7fb;
   font-family:
     Inter,
     'Noto Sans SC',
@@ -15,6 +17,55 @@ body {
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+.dashboard-page {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.dashboard-hero {
+  overflow: hidden;
+  position: relative;
+  border: 0;
+  background: linear-gradient(120deg, #0e4c78 0%, #1976a7 100%);
+  color: #fff;
+}
+
+.dashboard-hero::after {
+  content: '';
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  border: 28px solid rgb(255 255 255 / 10%);
+  border-radius: 50%;
+  right: -70px;
+  top: -90px;
+}
+
+.dashboard-hero .ant-typography {
+  color: #fff;
+}
+
+.stat-card {
+  height: 100%;
+  border-color: #e3eaf2;
+}
+
+.stat-card .ant-statistic-title {
+  color: #64748b;
+}
+
+.section-card {
+  height: 100%;
+  border-color: #e3eaf2;
 }
 
 @font-face {

@@ -14,3 +14,10 @@ export class LoginUserDto implements ILoginRequestType {
   @ApiProperty()
   password: string;
 }
+
+export class RefreshTokenDto {
+  @IsString()
+  @IsNotEmpty()
+  @ApiProperty()
+  refreshToken: string;
+}

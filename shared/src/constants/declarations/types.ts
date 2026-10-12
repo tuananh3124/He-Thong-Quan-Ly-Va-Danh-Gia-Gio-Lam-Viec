@@ -1,0 +1,3 @@
+import { DECLARATION_STATUS } from '.';
+
+export type DECLARATION_STATUS_TYPE = (typeof DECLARATION_STATUS)[keyof typeof DECLARATION_STATUS];

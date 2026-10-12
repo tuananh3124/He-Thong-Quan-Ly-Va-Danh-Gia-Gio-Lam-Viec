@@ -20,7 +20,7 @@ export const AdminLogin = () => {
       message: null,
       action: ({ data }) => {
         if (data) {
-          actions.set({ adminToken: data.accessToken });
+          actions.set({ adminToken: data.accessToken, user: data.user, role: data.user.role });
           navigate(dashboardUrl);
         }
       },
@@ -39,19 +39,19 @@ export const AdminLogin = () => {
   return (
     <Flex vertical align="center" gap="large" style={{ width: mobile ? '100%' : '50%' }}>
       <div style={{ textAlign: 'center' }}>
-        <Title level={2}>Login to your account</Title>
-        <Text type="secondary">Enter your email below to login to your account</Text>
+        <Title level={2}>Cổng quản trị</Title>
+        <Text type="secondary">Đăng nhập để quản lý quy định và phê duyệt kê khai</Text>
       </div>
 
       <Form form={form} layout="vertical" onFinish={handleSubmit} style={{ width: '100%' }}>
         <Form.Item
-          label="Email"
+          label="Email quản trị"
           name="email"
           rules={[
-            { required: true, message: 'Email is required' },
+            { required: true, message: 'Vui lòng nhập email' },
             {
               type: 'email',
-              message: 'Invalid email address',
+              message: 'Email không hợp lệ',
             },
           ]}
         >
@@ -59,16 +59,16 @@ export const AdminLogin = () => {
         </Form.Item>
 
         <Form.Item
-          label="Password"
+          label="Mật khẩu"
           name="password"
-          rules={[{ required: true, message: 'Password is required' }]}
+          rules={[{ required: true, message: 'Vui lòng nhập mật khẩu' }]}
         >
           <Input.Password onPressEnter={() => form.submit()} />
         </Form.Item>
 
         <Form.Item>
           <Button type="primary" htmlType="submit" loading={loading} block>
-            Login
+            Đăng nhập
           </Button>
         </Form.Item>
       </Form>

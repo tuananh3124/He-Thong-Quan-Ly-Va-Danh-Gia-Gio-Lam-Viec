@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
 import { PrismaService } from '@/common';
 import { getEnv } from '@/utils';
-import { ROLE } from '@projectname/shared';
+import { ILoginResponseType, ROLE } from '@projectname/shared';
 
 @Injectable()
 export class AuthService {
@@ -12,7 +12,46 @@ export class AuthService {
     private prisma: PrismaService,
   ) {}
 
-  async login(params: { email: string; password: string; isAdmin?: boolean }) {
+  private createTokens(userId: bigint) {
+    const payload = { userId: userId.toString() };
+
+    return {
+      accessToken: this.jwtService.sign(payload, {
+        secret: getEnv('JWT_SECRET_KEY'),
+        expiresIn: '3d',
+      }),
+      refreshToken: this.jwtService.sign(payload, {
+        secret: getEnv('JWT_REFRESH_SECRET_KEY'),
+        expiresIn: '7d',
+      }),
+    };
+  }
+
+  private toAuthUser(user: {
+    id: bigint;
+    name: string;
+    email: string;
+    role: string;
+    academicTitle: string | null;
+    degree: string | null;
+    managementRole: string | null;
+  }): ILoginResponseType['user'] {
+    return {
+      id: user.id.toString(),
+      name: user.name,
+      email: user.email,
+      role: user.role as ILoginResponseType['user']['role'],
+      academicTitle: user.academicTitle,
+      degree: user.degree,
+      managementRole: user.managementRole,
+    };
+  }
+
+  async login(params: {
+    email: string;
+    password: string;
+    isAdmin?: boolean;
+  }): Promise<ILoginResponseType> {
     const { email, password, isAdmin } = params;
 
     const user = await this.prisma.users.findFirst({
@@ -34,15 +73,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid password');
     }
 
-    const accessToken = this.jwtService.sign(
-      { userId: user.id.toString() },
-      { secret: getEnv('JWT_SECRET_KEY'), expiresIn: '3d' },
-    );
-
-    const refreshToken = this.jwtService.sign(
-      { userId: user.id.toString() },
-      { secret: getEnv('JWT_REFRESH_SECRET_KEY'), expiresIn: '7d' },
-    );
+    const tokens = this.createTokens(user.id);
 
     this.prisma.users
       .update({
@@ -51,22 +82,41 @@ export class AuthService {
       })
       .catch(() => null);
 
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        name: user.name,
-        email: user.email,
-      },
-    };
+    return { ...tokens, user: this.toAuthUser(user) };
   }
 
-  async auth(params: { userId: bigint }) {
+  async refresh(refreshToken: string): Promise<ILoginResponseType> {
+    let payload: { userId?: string };
+
+    try {
+      payload = (await this.jwtService.verifyAsync(refreshToken, {
+        secret: getEnv('JWT_REFRESH_SECRET_KEY'),
+      })) as { userId?: string };
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    if (!payload.userId) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const user = await this.prisma.users.findUnique({
+      where: { id: BigInt(payload.userId) },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return { ...this.createTokens(user.id), user: this.toAuthUser(user) };
+  }
+
+  async auth(params: { userId: string }) {
     const { userId } = params;
 
     const user = await this.prisma.users.findUnique({
       where: {
-        id: userId,
+        id: BigInt(userId),
       },
     });
 
@@ -75,10 +125,8 @@ export class AuthService {
     }
 
     return {
-      user: {
-        name: user.name,
-        email: user.email,
-      },
+      user: this.toAuthUser(user),
+      permissions: [],
     };
   }
 }

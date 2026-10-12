@@ -41,7 +41,7 @@ export interface UseHttpState<IRequestType = any, IResponseType = any> {
   loading: boolean;
   errorMessage: string | null;
   data: IResponseType | null;
-  fetchData: (overrideData?: IRequestType) => void;
+  fetchData: (overrideData?: IRequestType) => Promise<void>;
   pagination: IPaginationType;
   status?: number;
 }

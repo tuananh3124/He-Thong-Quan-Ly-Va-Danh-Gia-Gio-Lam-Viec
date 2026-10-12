@@ -2,7 +2,7 @@ import { Body, Controller, Get, Post } from '@nestjs/common';
 import { AuthService } from './service';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { Public, Payload, Roles } from '@/common';
-import { LoginUserDto } from './dto/login';
+import { LoginUserDto, RefreshTokenDto } from './dto/login';
 import { ILoginResponseType } from '@projectname/shared';
 import { IPayloadType } from '@/common/decorators/types';
 
@@ -27,6 +27,12 @@ export class AuthController {
       password,
       isAdmin: true,
     });
+  }
+
+  @Post('refresh')
+  @Public()
+  refresh(@Body() { refreshToken }: RefreshTokenDto): Promise<ILoginResponseType> {
+    return this.authService.refresh(refreshToken);
   }
 
   @Get()

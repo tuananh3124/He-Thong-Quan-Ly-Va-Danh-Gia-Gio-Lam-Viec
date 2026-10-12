@@ -90,7 +90,7 @@ export const useHttp = <T extends IHttpGenerics = IHttpGenerics>({
     data: null,
     errorMessage: null,
     pagination: defaultPagination,
-    fetchData: () => {},
+    fetchData: async () => {},
     status: undefined,
   });
 

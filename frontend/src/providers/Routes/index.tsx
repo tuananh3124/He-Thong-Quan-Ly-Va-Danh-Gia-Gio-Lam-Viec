@@ -6,16 +6,17 @@ import { RouteError } from '@/components';
 import { useGlobal } from '@/hooks';
 import { hasAnyPermission } from '@/utils';
 import type { ILayoutType, IMenuPositionType, IRouteType } from '@/types';
-import type { PERMISSION_TYPE } from '@projectname/shared';
+import type { PERMISSION_TYPE, ROLE_TYPE } from '@projectname/shared';
 import { adminRoutes } from '@/Admin/routes';
 
 const normalizeRoutes = (
   routes: IRouteType[],
   params: {
     permissions: PERMISSION_TYPE[];
+    role: ROLE_TYPE;
   },
 ): IRouteType[] => {
-  const { permissions } = params;
+  const { permissions, role } = params;
 
   return routes.flatMap((route) => {
     const handle = {
@@ -31,8 +32,12 @@ const normalizeRoutes = (
         : undefined,
     };
     const { permissions: routePermissions } = handle;
+    const routeRoles = handle.role ?? [];
 
-    if (!hasAnyPermission(permissions, routePermissions)) {
+    if (
+      !hasAnyPermission(permissions, routePermissions) ||
+      (routeRoles.length > 0 && !routeRoles.includes(role))
+    ) {
       return [];
     }
 
@@ -43,6 +48,7 @@ const normalizeRoutes = (
         children: route.children
           ? normalizeRoutes(route.children, {
               permissions,
+              role,
             })
           : undefined,
       },
@@ -51,22 +57,24 @@ const normalizeRoutes = (
 };
 
 export const Routes = () => {
-  const { permissions } = useGlobal();
+  const { permissions, role } = useGlobal();
 
   const finalRoutes = useMemo(() => {
     let mergedRoutes = routes;
 
     return normalizeRoutes(mergedRoutes, {
       permissions,
+      role,
     });
-  }, [permissions]);
+  }, [permissions, role]);
 
   const finalAdminRoutes = useMemo(
     () =>
       normalizeRoutes(adminRoutes, {
         permissions,
+        role,
       }),
-    [permissions],
+    [permissions, role],
   );
 
   const router = useMemo(

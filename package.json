@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm -r --parallel dev",
+    "dev": "pnpm --filter @projectname/shared build && pnpm -r --parallel dev",
     "build": "turbo run build",
     "build:backend": "turbo run build --filter=@projectname/backend",
     "format": "prettier --write .",

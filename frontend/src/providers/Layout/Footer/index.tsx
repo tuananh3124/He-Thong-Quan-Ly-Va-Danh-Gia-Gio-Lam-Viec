@@ -4,6 +4,6 @@ export const Footer = () => (
       textAlign: 'center',
     }}
   >
-    {`Copyright © ${new Date().getFullYear()} ProjectName. All Rights Reserved`}
+    {`© ${new Date().getFullYear()} • Hệ thống quản lý giờ làm việc tiêu chuẩn`}
   </div>
 );

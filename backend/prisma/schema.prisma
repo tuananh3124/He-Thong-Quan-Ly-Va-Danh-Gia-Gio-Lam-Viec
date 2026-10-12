@@ -16,27 +16,30 @@ model tenants {
 }
 
 model users {
-  id                 BigInt                @id @default(autoincrement())
-  createdAt          DateTime              @default(now()) @db.Timestamptz(6)
-  updatedAt          DateTime              @default(now()) @updatedAt @db.Timestamptz(6)
-  role               String
-  name               String
-  email              String                @unique() @db.VarChar(254)
-  password           String
-  lastLoginAt        DateTime?
-  tenantId           BigInt?
-  tenant             tenants?              @relation(fields: [tenantId], references: [id])
-  
-  academicTitle      String?
-  degree             String?
-  managementRole     String?
+  id          BigInt    @id @default(autoincrement())
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  role        String
+  name        String
+  email       String    @unique() @db.VarChar(254)
+  password    String
+  lastLoginAt DateTime?
+  tenantId    BigInt?
+  tenant      tenants?  @relation(fields: [tenantId], references: [id])
 
-  declarations       declarations[]
-  declarationAuthors declaration_authors[]
+  academicTitle  String?
+  degree         String?
+  managementRole String?
+
+  declarations         declarations[]
+  declarationAuthors   declaration_authors[]
+  reviewedDeclarations declarations[]        @relation("DeclarationReviewer")
 }
 
 model working_hour_norms {
-  id                BigInt   @id @default(autoincrement())
+  id                BigInt          @id @default(autoincrement())
+  academicYearId    BigInt?
+  academicYear      academic_years? @relation(fields: [academicYearId], references: [id])
   academicTitle     String
   degree            String
   teachingHoursNorm Float
@@ -45,13 +48,16 @@ model working_hour_norms {
 }
 
 model academic_years {
-  id              BigInt             @id @default(autoincrement())
-  name            String
-  startDate       DateTime
-  endDate         DateTime
-  isActive        Boolean            @default(true)
-  declarations    declarations[]
-  conversionRules conversion_rules[]
+  id               BigInt               @id @default(autoincrement())
+  name             String
+  startDate        DateTime
+  endDate          DateTime
+  isActive         Boolean              @default(true)
+  workingHourNorms working_hour_norms[]
+  declarations     declarations[]
+  conversionRules  conversion_rules[]
+
+  @@unique([name])
 }
 
 model publication_classifications {
@@ -60,6 +66,8 @@ model publication_classifications {
   description     String?
   sources         publication_sources[]
   conversionRules conversion_rules[]
+
+  @@unique([name])
 }
 
 model publication_sources {
@@ -68,19 +76,23 @@ model publication_sources {
   classificationId BigInt
   classification   publication_classifications @relation(fields: [classificationId], references: [id])
   declarations     declarations[]
+
+  @@unique([name, classificationId])
 }
 
 model conversion_rules {
-  id               BigInt                       @id @default(autoincrement())
-  activityType     String
-  classificationId BigInt?
-  classification   publication_classifications? @relation(fields: [classificationId], references: [id])
-  academicYearId   BigInt?
-  academicYear     academic_years?              @relation(fields: [academicYearId], references: [id])
-  hours            Float
-  conditions       String?
-  effectiveFrom    DateTime?
-  effectiveTo      DateTime?
+  id                  BigInt                       @id @default(autoincrement())
+  activityType        String
+  classificationId    BigInt?
+  classification      publication_classifications? @relation(fields: [classificationId], references: [id])
+  academicYearId      BigInt?
+  academicYear        academic_years?              @relation(fields: [academicYearId], references: [id])
+  hours               Float
+  priority            Int                          @default(0)
+  conditions          String?
+  effectiveFrom       DateTime?
+  effectiveTo         DateTime?
+  appliedDeclarations declarations[]               @relation("AppliedConversionRule")
 }
 
 model author_allocation_rules {
@@ -91,31 +103,44 @@ model author_allocation_rules {
 }
 
 model declarations {
-  id              BigInt                @id @default(autoincrement())
-  userId          BigInt
-  user            users                 @relation(fields: [userId], references: [id])
-  academicYearId  BigInt
-  academicYear    academic_years        @relation(fields: [academicYearId], references: [id])
-  activityType    String
-  name            String
-  url             String?
-  sourceId        BigInt?
-  source          publication_sources?  @relation(fields: [sourceId], references: [id])
-  status          String
-  aiConfidence    Float?
-  calculatedHours Float?
-  createdAt       DateTime              @default(now()) @db.Timestamptz(6)
-  updatedAt       DateTime              @default(now()) @updatedAt @db.Timestamptz(6)
-  authors         declaration_authors[]
+  id                  BigInt                @id @default(autoincrement())
+  userId              BigInt
+  user                users                 @relation(fields: [userId], references: [id])
+  academicYearId      BigInt
+  academicYear        academic_years        @relation(fields: [academicYearId], references: [id])
+  activityType        String
+  name                String
+  url                 String?
+  sourceId            BigInt?
+  source              publication_sources?  @relation(fields: [sourceId], references: [id])
+  status              String
+  aiConfidence        Float?
+  calculatedHours     Float?
+  createdAt           DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime              @default(now()) @updatedAt @db.Timestamptz(6)
+  authors             declaration_authors[]
+  submittedAt         DateTime?
+  reviewedAt          DateTime?
+  reviewedById        BigInt?
+  reviewedBy          users?                @relation("DeclarationReviewer", fields: [reviewedById], references: [id])
+  rejectionReason     String?
+  aiRawResult         Json?
+  aiProcessedAt       DateTime?
+  appliedRuleId       BigInt?
+  appliedRule         conversion_rules?     @relation("AppliedConversionRule", fields: [appliedRuleId], references: [id])
+  appliedRuleSnapshot Json?
+
+  @@index([userId, academicYearId, status])
 }
 
 model declaration_authors {
-  id             BigInt       @id @default(autoincrement())
-  declarationId  BigInt
-  declaration    declarations @relation(fields: [declarationId], references: [id])
-  authorName     String
-  userId         BigInt?
-  user           users?       @relation(fields: [userId], references: [id])
-  roleType       String
-  allocatedHours Float?
+  id                   BigInt       @id @default(autoincrement())
+  declarationId        BigInt
+  declaration          declarations @relation(fields: [declarationId], references: [id])
+  authorName           String
+  userId               BigInt?
+  user                 users?       @relation(fields: [userId], references: [id])
+  roleType             String
+  allocatedHours       Float?
+  allocationPercentage Float?
 }

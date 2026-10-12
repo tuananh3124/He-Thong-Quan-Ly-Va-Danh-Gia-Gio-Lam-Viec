@@ -1,17 +1,22 @@
-version: '3'
 services:
   nest_postgres_dev:
-    image: postgres:13.5
+    image: pgvector/pgvector:pg16
     restart: always
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=projectname
       - PGDATA=/var/lib/postgresql/data/pgdata
-      - TZ=Asia/Shanghai
+      - TZ=Asia/Ho_Chi_Minh
     volumes:
       - 'postgres_data:/var/lib/postgresql/data/pgdata'
     ports:
       - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d projectname']
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   pgbouncer:
     image: edoburu/pgbouncer
@@ -21,24 +26,14 @@ services:
     ports:
       - '6432:6432'
     volumes:
-      - ./api/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini
-      - ./api/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt
+      - ./backend/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini
+      - ./backend/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt
 
   redis_dev:
     restart: always
     image: redis:alpine
     ports:
       - '6379:6379'
-
-  # for build
-  # nest_api:
-  #   build:
-  #     context: .
-  #     dockerfile: ./Dockerfile
-  #   env_file: ./apps/api/.env
-  #   restart: always
-  #   ports:
-  #     - 3000:3000
 
 volumes:
   postgres_data:

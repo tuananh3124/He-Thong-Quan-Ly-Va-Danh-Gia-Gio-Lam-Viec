@@ -36,3 +36,17 @@ export const useAdminLogin = <
     method: 'post',
     ...params,
   });
+
+export const useRefreshToken = <
+  T extends IHttpGenerics = {
+    request: { refreshToken: string };
+    response: ILoginResponseType;
+  },
+>(
+  params: IHttpType<T>,
+) =>
+  useHttp<T>({
+    url: '/auth/refresh',
+    method: 'post',
+    ...params,
+  });

@@ -1,6 +1,6 @@
 import { ROLE_TYPE } from '@projectname/shared';
 
 export type IPayloadType = {
-  userId: bigint;
+  userId: string;
   role: ROLE_TYPE;
 };

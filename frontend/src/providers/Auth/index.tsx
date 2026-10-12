@@ -30,7 +30,11 @@ export const AuthProvider: React.FC<{
     },
     success: {
       action: ({ data }) => {
-        actions.set({ permissions: data.permissions || [], user: data.user });
+        actions.set({
+          permissions: data.permissions || [],
+          user: data.user,
+          role: data.user.role,
+        });
         setStatus('complete');
       },
     },

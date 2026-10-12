@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router-dom';
-import { Dashboard, HelpCenter, Login, Product, Settings as SettingPage } from '@/pages';
+import { Dashboard, Declarations, HelpCenter, Login, Settings as SettingPage } from '@/pages';
 import type { IRouteType } from '@/types';
-import { HelpCircle, LayoutDashboard, Package, Settings } from 'lucide-react';
+import { ClipboardList, HelpCircle, LayoutDashboard, Settings } from 'lucide-react';
 
 const NotFound = () => {
   throw new Response('Not Found', {
@@ -35,19 +35,19 @@ export const routes: IRouteType[] = [
     element: <Dashboard />,
     handle: {
       menu: {
-        label: 'Dashboard',
+        label: 'Tổng quan',
         icon: <LayoutDashboard size={18} />,
       },
     },
   },
   {
-    id: 'products',
-    path: '/products',
-    element: <Product />,
+    id: 'declarations',
+    path: '/declarations',
+    element: <Declarations />,
     handle: {
       menu: {
-        label: 'Product',
-        icon: <Package size={18} />,
+        label: 'Kê khai hoạt động',
+        icon: <ClipboardList size={18} />,
       },
     },
   },
@@ -56,7 +56,7 @@ export const routes: IRouteType[] = [
     path: '/settings',
     handle: {
       menu: {
-        label: 'Settings',
+        label: 'Cài đặt',
         icon: <Settings size={18} />,
       },
     },
@@ -67,7 +67,7 @@ export const routes: IRouteType[] = [
         element: <SettingPage />,
         handle: {
           menu: {
-            label: 'General Settings',
+            label: 'Hồ sơ cá nhân',
           },
         },
       },
@@ -79,7 +79,7 @@ export const routes: IRouteType[] = [
     element: <HelpCenter />,
     handle: {
       menu: {
-        label: 'Help Center',
+        label: 'Hướng dẫn sử dụng',
         icon: <HelpCircle size={18} />,
         position: 'BOTTOM',
       },
