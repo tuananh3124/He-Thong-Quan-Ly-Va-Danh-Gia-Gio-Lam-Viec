@@ -3,7 +3,7 @@ import { AuthService } from './service';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { Public, Payload, Roles } from '@/common';
 import { LoginUserDto, RefreshTokenDto } from './dto/login';
-import { ILoginResponseType } from '@projectname/shared';
+import { ILoginResponseType, ROLE } from '@projectname/shared';
 import { IPayloadType } from '@/common/decorators/types';
 
 @Controller('auth')
@@ -37,7 +37,7 @@ export class AuthController {
 
   @Get()
   @ApiBearerAuth()
-  @Roles('Admin', 'Staff')
+  @Roles(ROLE.Admin, ROLE.Manager, ROLE.Staff)
   async auth(@Payload('userId') userId: IPayloadType['userId']) {
     return this.authService.auth({
       userId,

@@ -2,6 +2,7 @@ import { Avatar, Card, Descriptions, Tag, Typography } from 'antd';
 import { UserOutlined } from '@ant-design/icons';
 import { Page } from '@/components/ui';
 import { useGlobal } from '@/hooks';
+import { ROLE, STAFF_CATEGORY } from '@projectname/shared';
 
 export const Settings: React.FC = () => {
   const { user } = useGlobal();
@@ -14,7 +15,24 @@ export const Settings: React.FC = () => {
         <Descriptions column={{ xs: 1, sm: 2 }} bordered>
           <Descriptions.Item label="Email">{user?.email}</Descriptions.Item>
           <Descriptions.Item label="Vai trò">
-            <Tag color="blue">{user?.role === 'Admin' ? 'Quản trị viên' : 'Cán bộ'}</Tag>
+            <Tag color="blue">
+              {user?.role === ROLE.Admin
+                ? 'Quản trị viên'
+                : user?.role === ROLE.Manager
+                  ? 'Quản lý'
+                  : user?.staffCategory === STAFF_CATEGORY.Researcher
+                    ? 'Nghiên cứu viên'
+                    : user?.staffCategory === STAFF_CATEGORY.Lecturer
+                      ? 'Giảng viên'
+                      : 'Cán bộ'}
+            </Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="Nhóm cán bộ">
+            {user?.staffCategory === STAFF_CATEGORY.Researcher
+              ? 'Nghiên cứu viên'
+              : user?.staffCategory === STAFF_CATEGORY.Lecturer
+                ? 'Giảng viên'
+                : 'Chưa cập nhật'}
           </Descriptions.Item>
           <Descriptions.Item label="Chức danh">
             {user?.academicTitle ?? 'Chưa cập nhật'}

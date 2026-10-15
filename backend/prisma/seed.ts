@@ -34,8 +34,31 @@ async function main() {
         password: passwordTest,
         tenantId: tenant.id,
         role: ROLE.Staff,
+        staffCategory: 'LECTURER',
         academicTitle: 'Giảng viên',
         degree: 'TS',
+      },
+    });
+  } else if (!user.staffCategory) {
+    await prisma.users.update({
+      where: { id: user.id },
+      data: { staffCategory: 'LECTURER' },
+    });
+  }
+
+  const managerUser = await prisma.users.findUnique({
+    where: { email: 'manager@test.com' },
+  });
+
+  if (!managerUser) {
+    await prisma.users.create({
+      data: {
+        name: 'Test Manager',
+        email: 'manager@test.com',
+        password: passwordTest,
+        tenantId: tenant.id,
+        role: ROLE.Manager,
+        managementRole: 'Quản lý đơn vị',
       },
     });
   }

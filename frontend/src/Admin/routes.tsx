@@ -1,6 +1,6 @@
-import { Gauge } from 'lucide-react';
+import { Gauge, Users } from 'lucide-react';
 import type { IRouteType } from '@/types';
-import { AdminLogin } from './pages';
+import { AdminLogin, Users as UsersPage } from './pages';
 import { AdminDashboard } from './pages/Dashboard';
 
 export const adminRoutes: IRouteType[] = [
@@ -31,6 +31,18 @@ export const adminRoutes: IRouteType[] = [
       menu: {
         label: 'Dashboard',
         icon: <Gauge size={18} />,
+      },
+    },
+  },
+  {
+    id: 'admin/users',
+    path: '/admin/users',
+    element: <UsersPage />,
+    handle: {
+      role: ['Admin'],
+      menu: {
+        label: 'Người dùng',
+        icon: <Users size={18} />,
       },
     },
   },

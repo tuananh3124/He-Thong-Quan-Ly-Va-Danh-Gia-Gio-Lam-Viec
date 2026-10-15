@@ -11,7 +11,7 @@ services:
     volumes:
       - 'postgres_data:/var/lib/postgresql/data/pgdata'
     ports:
-      - '5432:5432'
+      - '55432:5432'
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres -d projectname']
       interval: 5s

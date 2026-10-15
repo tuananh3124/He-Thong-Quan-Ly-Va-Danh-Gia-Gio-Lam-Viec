@@ -1,4 +1,4 @@
-import type { ROLE_TYPE } from '../../constants/roles/types';
+import type { ROLE_TYPE, STAFF_CATEGORY_TYPE } from '../../constants/types';
 
 export type ILoginRequestType = {
   email: string;
@@ -10,6 +10,7 @@ export type IAuthUserType = {
   name: string;
   email: string;
   role: ROLE_TYPE;
+  staffCategory?: STAFF_CATEGORY_TYPE | null;
   academicTitle?: string | null;
   degree?: string | null;
   managementRole?: string | null;

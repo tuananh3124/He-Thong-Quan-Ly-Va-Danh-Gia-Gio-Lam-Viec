@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/common';
 
 const toFraction = (value: number) => (value > 1 ? value / 100 : value);
@@ -55,7 +55,26 @@ export class DeclarationRuleEngineService {
     const ruleByRole = new Map(
       allocationRules.map((item) => [item.roleType, toFraction(item.percentage)]),
     );
-    let percentages = declaration.authors.map((author) => ruleByRole.get(author.roleType));
+    const hasManualAllocations = declaration.authors.some(
+      (author) => author.allocationPercentage !== null,
+    );
+    let percentages: Array<number | undefined>;
+
+    if (hasManualAllocations) {
+      if (declaration.authors.some((author) => author.allocationPercentage === null)) {
+        throw new BadRequestException('Every author must have a contribution percentage');
+      }
+      const total = declaration.authors.reduce(
+        (sum, author) => sum + (author.allocationPercentage ?? 0),
+        0,
+      );
+      if (Math.abs(total - 100) > 0.01) {
+        throw new BadRequestException('Author contribution percentages must total 100');
+      }
+      percentages = declaration.authors.map((author) => (author.allocationPercentage ?? 0) / 100);
+    } else {
+      percentages = declaration.authors.map((author) => ruleByRole.get(author.roleType));
+    }
 
     if (!percentages.length || percentages.every((value) => value === undefined)) {
       percentages = percentages.map(() => 1 / declaration.authors.length);

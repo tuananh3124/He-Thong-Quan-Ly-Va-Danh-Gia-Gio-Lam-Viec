@@ -20,17 +20,44 @@ export type Declaration = {
   id: string;
   activityType: string;
   name: string;
+  url?: string | null;
+  publicationYear?: number | null;
+  doi?: string | null;
   status: string;
   calculatedHours: number | null;
   academicYearId: string;
+  academicYear?: AcademicYear;
   sourceId: string | null;
+  source?: PublicationSource | null;
+  hasEvidence?: boolean;
+  evidenceOriginalName?: string | null;
+  evidenceSize?: number | null;
+  submittedAt?: string | null;
   rejectionReason?: string | null;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    academicTitle?: string | null;
+  };
   authors?: Array<{
     id: string;
     authorName: string;
     roleType: string;
     allocatedHours: number | null;
+    allocationPercentage?: number | null;
   }>;
+};
+
+export type DeclarationAuthorRequest = {
+  authorName: string;
+  roleType: 'MAIN_AUTHOR' | 'CO_AUTHOR';
+  allocationPercentage?: number;
+};
+
+export type ReviewDeclarationRequest = {
+  decision: 'APPROVED' | 'REJECTED';
+  reason?: string;
 };
 
 export type CreateDeclarationRequest = {
@@ -39,6 +66,9 @@ export type CreateDeclarationRequest = {
   academicYearId: string;
   sourceId?: string;
   url?: string;
+  publicationYear?: number;
+  doi?: string;
+  authors?: DeclarationAuthorRequest[];
 };
 
 export const useDeclarations = <
@@ -59,6 +89,30 @@ export const useCreateDeclaration = <
 ) =>
   useHttp<T>({
     url: '/declarations',
+    method: 'post',
+    ...params,
+  });
+
+export const useUpdateDeclaration = <
+  T extends IHttpGenerics = { request: CreateDeclarationRequest; response: Declaration },
+>(
+  id: string,
+  params?: IHttpType<T>,
+) =>
+  useHttp<T>({
+    url: `/declarations/${id}`,
+    method: 'patch',
+    ...params,
+  });
+
+export const useUploadDeclarationEvidence = <
+  T extends IHttpGenerics = { request: FormData; response: Declaration },
+>(
+  id: string,
+  params?: IHttpType<T>,
+) =>
+  useHttp<T>({
+    url: `/declarations/${id}/evidence`,
     method: 'post',
     ...params,
   });
@@ -84,6 +138,18 @@ export const useSubmitDeclaration = <
   useHttp<T>({
     url: `/declarations/${id}/submit`,
     method: 'post',
+    ...params,
+  });
+
+export const useReviewDeclaration = <
+  T extends IHttpGenerics = { request: ReviewDeclarationRequest; response: Declaration },
+>(
+  id: string,
+  params?: IHttpType<T>,
+) =>
+  useHttp<T>({
+    url: `/declarations/${id}/review`,
+    method: 'patch',
     ...params,
   });
 

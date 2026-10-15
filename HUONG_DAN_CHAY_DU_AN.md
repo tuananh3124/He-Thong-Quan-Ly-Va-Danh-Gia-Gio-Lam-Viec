@@ -55,7 +55,7 @@ Các cấu hình mặc định dùng cho môi trường local:
 File: `backend/.env`
 
 ```env
-DATABASE_URL="postgresql://postgres:password@localhost:5432/projectname?schema=public"
+DATABASE_URL="postgresql://postgres:password@localhost:55432/projectname?schema=public"
 JWT_SECRET_KEY="local-access-secret-change-me"
 JWT_REFRESH_SECRET_KEY="local-refresh-secret-change-me"
 REDIS_HOST="localhost"
@@ -78,7 +78,7 @@ File: `ai-service/.env`
 Mặc định file này đã trỏ tới PostgreSQL dùng chung:
 
 ```env
-DATABASE_URL=postgresql+psycopg://postgres:password@localhost:5432/projectname
+DATABASE_URL=postgresql+psycopg://postgres:password@localhost:55432/projectname
 OPENAI_API_KEY=your-api-key
 ```
 
@@ -102,7 +102,7 @@ Các cổng mặc định:
 
 | Thành phần            |   Cổng |
 | --------------------- | -----: |
-| PostgreSQL + pgvector | `5432` |
+| PostgreSQL + pgvector | `55432` |
 | PgBouncer             | `6432` |
 | Redis                 | `6379` |
 
@@ -180,9 +180,11 @@ Sau khi chạy `pnpm prisma:seed`:
 | Vai trò | Email             | Mật khẩu    | Đường dẫn      |
 | ------- | ----------------- | ----------- | -------------- |
 | Cán bộ  | `test@test.com`   | `Abc123456` | `/login`       |
+| Quản lý | `manager@test.com` | `Abc123456` | `/login`       |
 | Admin   | `admin@admin.com` | `Abc123456` | `/admin/login` |
 
 Đây chỉ là tài khoản local để kiểm thử. Không dùng các thông tin này trên production.
+Tài khoản quản lý xem và xử lý kê khai của cán bộ trong cùng tenant.
 
 ## 10. Luồng sử dụng chính
 
@@ -190,20 +192,28 @@ Sau khi chạy `pnpm prisma:seed`:
 
 1. Đăng nhập tại `/login`.
 2. Mở mục `Kê khai hoạt động`.
-3. Tạo bản kê khai mới.
-4. Chọn loại hoạt động và năm học.
-5. Lưu bản nháp.
-6. Bấm `Tính giờ` để áp dụng Rule Engine.
-7. Kiểm tra kết quả.
-8. Bấm `Gửi duyệt`.
+3. Tạo bản kê khai mới hoặc sửa bản nháp/bản bị từ chối.
+4. Chọn loại hoạt động và năm học; với nghiên cứu, nhập năm xuất bản, DOI và tác giả.
+5. Thêm URL minh chứng hoặc tải lên một tệp PDF tối đa 20 MB.
+6. Lưu bản nháp, bấm `Tính giờ` và kiểm tra giờ phân bổ cho tác giả.
+7. Bấm `Gửi duyệt`.
+
+Tệp PDF được lưu cục bộ trong `backend/uploads/evidence` và không được đưa vào Git. Khi triển khai nhiều máy chủ, cần chuyển sang object storage dùng chung.
+
+### Quản lý
+
+1. Đăng nhập tại `/login`.
+2. Mở `Kê khai hoạt động` để xem hồ sơ đã gửi trong tenant.
+3. Mở hồ sơ, kiểm tra metadata và minh chứng, sau đó phê duyệt hoặc từ chối kèm lý do.
 
 ### Admin
 
 1. Đăng nhập tại `/admin/login`.
-2. Quản lý năm học.
-3. Quản lý nguồn và phân loại công bố.
-4. Cấu hình quy tắc quy đổi.
-5. Xem và phê duyệt kê khai.
+2. Mở `Người dùng` để tạo tài khoản hoặc chỉnh sửa vai trò, nhóm cán bộ và đơn vị.
+3. Tài khoản cán bộ cần chọn giảng viên/nghiên cứu viên và đơn vị; tài khoản quản lý cần chọn đơn vị.
+4. Quản lý năm học, nguồn và phân loại công bố.
+5. Cấu hình quy tắc quy đổi.
+6. Theo dõi kê khai và cấu hình hệ thống.
 
 ## 11. Build và kiểm tra
 
@@ -253,7 +263,7 @@ docker compose logs nest_postgres_dev
 Đảm bảo `backend/.env` dùng đúng database:
 
 ```env
-DATABASE_URL="postgresql://postgres:password@localhost:5432/projectname?schema=public"
+DATABASE_URL="postgresql://postgres:password@localhost:55432/projectname?schema=public"
 ```
 
 ### Prisma báo thiếu biến môi trường
@@ -266,7 +276,7 @@ pnpm prisma:push
 
 ### Port đã được sử dụng
 
-Kiểm tra các cổng `3000`, `5173`, `5432`, `6379` và `8000`. Có thể dừng stack Docker bằng:
+Kiểm tra các cổng `3000`, `5173`, `55432`, `6379` và `8000`. Có thể dừng stack Docker bằng:
 
 ```powershell
 docker compose down

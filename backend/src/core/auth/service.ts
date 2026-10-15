@@ -32,6 +32,7 @@ export class AuthService {
     name: string;
     email: string;
     role: string;
+    staffCategory: string | null;
     academicTitle: string | null;
     degree: string | null;
     managementRole: string | null;
@@ -41,6 +42,7 @@ export class AuthService {
       name: user.name,
       email: user.email,
       role: user.role as ILoginResponseType['user']['role'],
+      staffCategory: user.staffCategory as ILoginResponseType['user']['staffCategory'],
       academicTitle: user.academicTitle,
       degree: user.degree,
       managementRole: user.managementRole,
@@ -60,7 +62,7 @@ export class AuthService {
           equals: email,
           mode: 'insensitive',
         },
-        role: isAdmin ? ROLE.Admin : ROLE.Staff,
+        role: isAdmin ? ROLE.Admin : { in: [ROLE.Staff, ROLE.Manager] },
       },
     });
 

@@ -29,6 +29,7 @@ model users {
 
   academicTitle  String?
   degree         String?
+  staffCategory  String?
   managementRole String?
 
   declarations         declarations[]
@@ -110,7 +111,13 @@ model declarations {
   academicYear        academic_years        @relation(fields: [academicYearId], references: [id])
   activityType        String
   name                String
+  publicationYear     Int?
+  doi                 String?
   url                 String?
+  evidencePath        String?
+  evidenceOriginalName String?
+  evidenceContentType String?
+  evidenceSize        Int?
   sourceId            BigInt?
   source              publication_sources?  @relation(fields: [sourceId], references: [id])
   status              String
