@@ -24,13 +24,14 @@ import {
   ReloadOutlined,
   UploadOutlined,
 } from '@ant-design/icons';
-import { ACTIVITY_TYPE, ROLE } from '@projectname/shared';
+import { ACTIVITY_TYPE, ROLE, STAFF_CATEGORY } from '@projectname/shared';
 import { Page } from '@/components/ui';
 import { useGlobal, useMessage } from '@/hooks';
 import {
   useAcademicYears,
   useCalculateDeclaration,
   useCreateDeclaration,
+  useConversionRules,
   useDeclarations,
   usePublicationSources,
   useReviewDeclaration,
@@ -38,6 +39,7 @@ import {
   useUpdateDeclaration,
   type CreateDeclarationRequest,
   type Declaration,
+  type ConversionRule,
   type ReviewDeclarationRequest,
 } from '@/services';
 
@@ -63,7 +65,7 @@ const statusLabel: Record<string, string> = {
 };
 
 export const Declarations = () => {
-  const { role, apiBaseUrl, token } = useGlobal();
+  const { role, apiBaseUrl, token, user } = useGlobal();
   const toast = useMessage();
   const isManager = role === ROLE.Manager;
   const [open, setOpen] = useState(false);
@@ -81,6 +83,12 @@ export const Declarations = () => {
   });
   const academicYears = useAcademicYears();
   const sources = usePublicationSources();
+  const conversionRules = useConversionRules();
+  const visibleActivityOptions = user?.staffCategory === STAFF_CATEGORY.Researcher
+    ? activityOptions.filter((item) => item.value === ACTIVITY_TYPE.RESEARCH)
+    : user?.staffCategory === STAFF_CATEGORY.Lecturer
+      ? activityOptions.filter((item) => [ACTIVITY_TYPE.RESEARCH, ACTIVITY_TYPE.TEACHING].includes(item.value as any))
+      : activityOptions;
 
   const closeEditor = () => {
     setOpen(false);
@@ -143,6 +151,7 @@ export const Declarations = () => {
     if (!isManager) {
       academicYears.fetchData();
       sources.fetchData();
+      conversionRules.fetchData();
     }
   };
 
@@ -185,6 +194,8 @@ export const Declarations = () => {
       name: record.name,
       academicYearId: record.academicYearId,
       sourceId: record.sourceId ?? undefined,
+      conversionRuleCode: record.conversionRuleCode ?? undefined,
+      quantity: record.quantity ?? 1,
       url: record.url ?? undefined,
       publicationYear: record.publicationYear ?? undefined,
       doi: record.doi ?? undefined,
@@ -223,6 +234,7 @@ export const Declarations = () => {
     setEditingEvidenceName(null);
     setEvidenceFileList([]);
     form.resetFields();
+    form.setFieldsValue({ quantity: 1 });
     setOpen(true);
   };
 
@@ -288,7 +300,7 @@ export const Declarations = () => {
             dataIndex: 'activityType',
             key: 'activityType',
             render: (value: string) =>
-              activityOptions.find((item) => item.value === value)?.label ?? value,
+              visibleActivityOptions.find((item) => item.value === value)?.label ?? value,
           },
           {
             title: 'Trạng thái',
@@ -303,6 +315,15 @@ export const Declarations = () => {
             dataIndex: 'calculatedHours',
             key: 'calculatedHours',
             render: (value: number | null) => value ?? 'Chưa tính',
+          },
+          {
+            title: 'AI minh chứng',
+            key: 'ai',
+            render: (_: unknown, record: Declaration) => record.aiConfidence == null
+              ? <Tag>Chưa phân tích</Tag>
+              : <Tag color={record.aiRawResult?.needs_review ? 'orange' : 'green'}>
+                  {record.aiRawResult?.needs_review ? 'Cần kiểm tra' : 'Đã phân tích'} ({Math.round(record.aiConfidence * 100)}%)
+                </Tag>,
           },
           {
             title: 'Thao tác',
@@ -356,14 +377,65 @@ export const Declarations = () => {
           <Form form={form} layout="vertical" onFinish={handleSave}>
             <Form.Item name="activityType" label="Loại hoạt động" rules={[{ required: true }]}>
               <Select
-                options={activityOptions}
+                  options={visibleActivityOptions}
                 placeholder="Chọn loại hoạt động"
                 onChange={(value) => {
+                  form.setFieldsValue({ conversionRuleCode: undefined, quantity: 1 });
                   if (value !== ACTIVITY_TYPE.RESEARCH) {
                     form.setFieldsValue({ publicationYear: undefined, doi: undefined, authors: [] });
                   }
                 }}
               />
+            </Form.Item>
+            <Form.Item
+              noStyle
+              shouldUpdate={(previous, current) =>
+                previous.activityType !== current.activityType || previous.sourceId !== current.sourceId
+              }
+            >
+              {({ getFieldValue }) => {
+                const activityType = getFieldValue('activityType');
+                const source = (sources.data ?? []).find(
+                  (item) => item.id === getFieldValue('sourceId'),
+                );
+                const rules = (conversionRules.data ?? []).filter(
+                  (rule) =>
+                    rule.activityType === activityType &&
+                    (!rule.classificationId || rule.classificationId === source?.classificationId),
+                );
+                return (
+                  <>
+                    <Form.Item
+                      name="conversionRuleCode"
+                      label="Quy tắc quy đổi"
+                      rules={[{ required: true, message: 'Chọn quy tắc quy đổi' }]}
+                    >
+                      <Select
+                        showSearch
+                        optionFilterProp="label"
+                        loading={conversionRules.loading}
+                        placeholder="Chọn loại hoạt động cụ thể"
+                        options={rules.map((rule: ConversionRule) => ({
+                          value: rule.code ?? rule.id,
+                          label: `${rule.label ?? rule.code ?? 'Quy tắc'}${rule.classification?.name ? ` (${rule.classification.name})` : ''} · ${rule.minHours != null || rule.maxHours != null ? `${rule.minHours ?? rule.hours}–${rule.maxHours ?? rule.hours}` : rule.hours} giờ${rule.unit ? `/${rule.unit}` : ''}`,
+                        }))}
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      name="quantity"
+                      label="Số lượng"
+                      rules={[{ required: true, message: 'Nhập số lượng' }]}
+                      extra={
+                        rules.length
+                          ? 'Giờ quy đổi = định mức của rule × số lượng.'
+                          : 'Chưa có rule cho loại hoạt động này.'
+                      }
+                    >
+                      <InputNumber min={0.01} precision={2} style={{ width: '100%' }} />
+                    </Form.Item>
+                  </>
+                );
+              }}
             </Form.Item>
             <Form.Item name="name" label="Tên hoạt động / bài nghiên cứu" rules={[{ required: true }]}>
               <Input placeholder="Nhập tên hoạt động hoặc tên bài nghiên cứu" />
@@ -381,6 +453,7 @@ export const Declarations = () => {
               <Select
                 allowClear
                 placeholder="Chọn nếu là hoạt động nghiên cứu"
+                onChange={() => form.setFieldsValue({ conversionRuleCode: undefined })}
                 options={(sources.data ?? []).map((source) => ({
                   value: source.id,
                   label: `${source.name} - ${source.classification?.name ?? ''}`,

@@ -38,6 +38,15 @@ export class DeclarationsController {
     return this.declarationsService.list(userId, role, status);
   }
 
+  @Get('manager-summary')
+  @Roles(ROLE.Manager, ROLE.Admin)
+  managerSummary(
+    @Payload('userId') userId: IPayloadType['userId'],
+    @Payload('role') role: IPayloadType['role'],
+  ) {
+    return this.declarationsService.managerSummary(userId, role);
+  }
+
   @Post()
   @Roles(ROLE.Staff)
   create(@Payload('userId') userId: IPayloadType['userId'], @Body() dto: CreateDeclarationDto) {

@@ -1,7 +1,8 @@
 import { Navigate } from 'react-router-dom';
-import { Dashboard, Declarations, HelpCenter, Login, Settings as SettingPage } from '@/pages';
+import { Dashboard, Declarations, HelpCenter, Login, ManagerDashboard, Settings as SettingPage } from '@/pages';
 import type { IRouteType } from '@/types';
-import { ClipboardList, HelpCircle, LayoutDashboard, Settings } from 'lucide-react';
+import { BarChart3, ClipboardList, HelpCircle, LayoutDashboard, Settings } from 'lucide-react';
+import { ROLE } from '@projectname/shared';
 
 const NotFound = () => {
   throw new Response('Not Found', {
@@ -48,6 +49,18 @@ export const routes: IRouteType[] = [
       menu: {
         label: 'Kê khai hoạt động',
         icon: <ClipboardList size={18} />,
+      },
+    },
+  },
+  {
+    id: 'manager-dashboard',
+    path: '/manager/dashboard',
+    element: <ManagerDashboard />,
+    handle: {
+      role: [ROLE.Manager],
+      menu: {
+        label: 'Thống kê đơn vị',
+        icon: <BarChart3 size={18} />,
       },
     },
   },

@@ -55,22 +55,17 @@ export const Dashboard = () => {
                 {academicYears.data?.[0]?.name ?? 'Năm học hiện tại'}
               </Typography.Text>
               <Typography.Title level={2} style={{ margin: 0 }}>
-                Chào mừng bạn trở lại
+                Tổng quan công việc
               </Typography.Title>
-              <Typography.Paragraph
-                style={{ margin: 0, maxWidth: 620, color: 'rgba(255,255,255,.82)' }}
-              >
-                Khai báo hoạt động, đính kèm minh chứng và theo dõi số giờ làm việc tiêu chuẩn của
-                bạn.
-              </Typography.Paragraph>
             </Flex>
             <Button
+              className="dashboard-hero-action"
               ghost
               type="primary"
               icon={<ArrowRightOutlined />}
               onClick={() => navigate('/declarations')}
             >
-              Mở danh sách kê khai
+              Xem kê khai
             </Button>
           </Flex>
         </Card>
@@ -154,12 +149,9 @@ export const Dashboard = () => {
           <Col xs={24} lg={10}>
             <Card className="section-card" title="Tiến độ phê duyệt">
               <Flex vertical gap="middle">
-                <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
-                  Tỷ lệ bản kê khai đã được duyệt trong năm học hiện tại.
-                </Typography.Paragraph>
                 <Progress type="circle" percent={progress} strokeColor="#1769aa" />
                 <Typography.Text type="secondary">
-                  Cập nhật tự động theo trạng thái hồ sơ của bạn.
+                  {approvedCount}/{items.length} bản kê khai đã duyệt
                 </Typography.Text>
               </Flex>
             </Card>

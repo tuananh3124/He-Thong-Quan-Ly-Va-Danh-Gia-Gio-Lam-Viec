@@ -18,6 +18,8 @@ export type ManagedUser = {
   academicTitle: string | null;
   degree: string | null;
   managementRole: string | null;
+  department: string | null;
+  room: string | null;
 };
 
 export type CreateUserRequest = {
@@ -30,6 +32,8 @@ export type CreateUserRequest = {
   academicTitle?: string;
   degree?: string;
   managementRole?: string;
+  department?: string;
+  room?: string;
 };
 
 export type UpdateUserRequest = Partial<Omit<CreateUserRequest, 'password'>>;

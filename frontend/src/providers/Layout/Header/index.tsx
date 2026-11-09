@@ -4,23 +4,11 @@ import { Button, Flex, Tag, Typography } from 'antd';
 import { useLocation } from 'react-router-dom';
 import { ROLE, STAFF_CATEGORY } from '@projectname/shared';
 
-const pageMeta: Record<string, { title: string; description: string }> = {
-  '/dashboard': {
-    title: 'Tổng quan',
-    description: 'Theo dõi tiến độ hoàn thành giờ làm việc trong năm học',
-  },
-  '/declarations': {
-    title: 'Kê khai hoạt động',
-    description: 'Quản lý hoạt động giảng dạy, nghiên cứu và chuyên môn',
-  },
-  '/settings/general': {
-    title: 'Hồ sơ cá nhân',
-    description: 'Thông tin chức danh và tài khoản của bạn',
-  },
-  '/help': {
-    title: 'Hướng dẫn sử dụng',
-    description: 'Các bước kê khai và gửi minh chứng',
-  },
+const pageMeta: Record<string, { title: string }> = {
+  '/dashboard': { title: 'Tổng quan' },
+  '/declarations': { title: 'Kê khai hoạt động' },
+  '/settings/general': { title: 'Hồ sơ cá nhân' },
+  '/help': { title: 'Hướng dẫn sử dụng' },
 };
 
 export const Header = () => {
@@ -43,12 +31,7 @@ export const Header = () => {
           onClick={() => actions.set({ collapsed: !collapsed })}
           size="large"
         />
-        <Flex vertical>
-          <Typography.Text strong>{meta.title}</Typography.Text>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {meta.description}
-          </Typography.Text>
-        </Flex>
+        <Typography.Text strong>{meta.title}</Typography.Text>
       </Flex>
       <Flex align="center" gap="small">
         <Tag color="blue">

@@ -83,6 +83,8 @@ export class UsersService {
           academicTitle: dto.academicTitle?.trim() || null,
           degree: dto.degree?.trim() || null,
           managementRole: dto.managementRole?.trim() || null,
+          department: dto.department?.trim() || null,
+          room: dto.room?.trim() || null,
         },
         include: { tenant: true },
       });
@@ -141,6 +143,8 @@ export class UsersService {
           degree: dto.degree === undefined ? undefined : dto.degree?.trim() || null,
           managementRole:
             dto.managementRole === undefined ? undefined : dto.managementRole?.trim() || null,
+          department: dto.department === undefined ? undefined : dto.department?.trim() || null,
+          room: dto.room === undefined ? undefined : dto.room?.trim() || null,
         },
         include: { tenant: true },
       });

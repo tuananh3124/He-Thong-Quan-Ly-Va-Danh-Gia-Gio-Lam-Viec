@@ -14,6 +14,8 @@ export type IAuthUserType = {
   academicTitle?: string | null;
   degree?: string | null;
   managementRole?: string | null;
+  department?: string | null;
+  room?: string | null;
 };
 
 export type ILoginResponseType = {

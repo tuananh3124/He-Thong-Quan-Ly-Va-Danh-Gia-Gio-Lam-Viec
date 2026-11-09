@@ -44,4 +44,14 @@ export class UpdateUserDto {
   @IsOptional()
   @ApiProperty({ required: false })
   managementRole?: string | null;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty({ required: false })
+  department?: string | null;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty({ required: false })
+  room?: string | null;
 }

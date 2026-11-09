@@ -7,7 +7,7 @@ import { ConversionRulesService } from './service';
 
 @Controller('conversion-rules')
 @ApiBearerAuth()
-@Roles(ROLE.Staff, ROLE.Admin)
+@Roles(ROLE.Staff, ROLE.Manager, ROLE.Admin)
 export class ConversionRulesController {
   constructor(private readonly conversionRulesService: ConversionRulesService) {}
 

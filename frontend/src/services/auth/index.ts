@@ -1,6 +1,7 @@
 import { useHttp } from '@/hooks';
 import type { IHttpGenerics, IHttpType } from '@/hooks/types';
 import type { ILoginRequestType, ILoginResponseType } from '@projectname/shared';
+import type { IAuthUserType } from '@projectname/shared';
 
 export const useAuth = <T extends IHttpGenerics>(params?: IHttpType<T>) =>
   useHttp<T>({
@@ -48,5 +49,24 @@ export const useRefreshToken = <
   useHttp<T>({
     url: '/auth/refresh',
     method: 'post',
+    ...params,
+  });
+
+export const useUpdateProfile = <
+  T extends IHttpGenerics = {
+    request: {
+      name?: string;
+      academicTitle?: string;
+      degree?: string;
+      managementRole?: string;
+      department?: string;
+      room?: string;
+    };
+    response: { user: IAuthUserType; permissions: [] };
+  },
+>(params?: IHttpType<T>) =>
+  useHttp<T>({
+    url: '/auth',
+    method: 'patch',
     ...params,
   });

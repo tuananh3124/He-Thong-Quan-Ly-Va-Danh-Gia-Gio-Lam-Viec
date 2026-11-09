@@ -92,6 +92,8 @@ export const Users = () => {
       academicTitle: user.academicTitle ?? undefined,
       degree: user.degree ?? undefined,
       managementRole: user.managementRole ?? undefined,
+      department: user.department ?? undefined,
+      room: user.room ?? undefined,
     });
     setOpen(true);
   };
@@ -178,6 +180,11 @@ export const Users = () => {
             key: 'profile',
             render: (_: unknown, user: ManagedUser) =>
               [user.academicTitle, user.managementRole].filter(Boolean).join(' · ') || '—',
+          },
+          {
+            title: 'Khoa / phòng',
+            key: 'organization',
+            render: (_: unknown, user: ManagedUser) => [user.department, user.room].filter(Boolean).join(' / ') || '—',
           },
           {
             title: 'Thao tác',
@@ -269,6 +276,12 @@ export const Users = () => {
           </Form.Item>
           <Form.Item name="managementRole" label="Chức vụ quản lý">
             <Input placeholder="Không bắt buộc" />
+          </Form.Item>
+          <Form.Item name="department" label="Khoa">
+            <Input placeholder="Ví dụ: Khoa Công nghệ thông tin" />
+          </Form.Item>
+          <Form.Item name="room" label="Phòng/Bộ môn">
+            <Input placeholder="Ví dụ: Bộ môn Kỹ thuật phần mềm" />
           </Form.Item>
           <Typography.Text type="secondary">
             Mật khẩu chỉ được đặt khi tạo tài khoản; hệ thống lưu mật khẩu đã băm.

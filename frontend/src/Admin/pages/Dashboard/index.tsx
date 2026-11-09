@@ -1,17 +1,13 @@
-import { Alert, Card, Col, Row, Statistic, Typography } from 'antd';
+import { Alert, Card, Col, Row, Statistic } from 'antd';
 import { CheckCircleOutlined, FileProtectOutlined, SettingOutlined } from '@ant-design/icons';
 import { Page } from '@/components/ui';
 
 export const AdminDashboard = () => (
   <Page title="Tổng quan quản trị">
-    <Typography.Paragraph type="secondary">
-      Quản lý danh mục, quy tắc quy đổi và theo dõi hồ sơ cần phê duyệt.
-    </Typography.Paragraph>
     <Alert
       showIcon
       type="info"
-      message="Khu vực quản trị đang được triển khai theo từng phân hệ"
-      description="Bạn có thể bắt đầu bằng việc cấu hình năm học, nguồn công bố và quy tắc quy đổi giờ."
+      message="Cấu hình năm học, nguồn công bố và quy tắc quy đổi giờ tại các phân hệ quản trị."
       style={{ marginBottom: 16 }}
     />
     <Row gutter={[16, 16]}>

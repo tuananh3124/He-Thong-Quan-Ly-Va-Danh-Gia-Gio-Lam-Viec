@@ -5,3 +5,4 @@ export type ENV_TYPE =
   | 'REDIS_HOST'
   | 'NODE_ENV'
   | 'BASE_URL'
+  | 'AI_SERVICE_URL'

@@ -5,13 +5,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { access, mkdir, unlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { DECLARATION_STATUS, ROLE, ROLE_TYPE } from '@projectname/shared';
+import axios from 'axios';
+import { ACTIVITY_TYPE, DECLARATION_STATUS, ROLE, ROLE_TYPE, STAFF_CATEGORY } from '@projectname/shared';
 import { PrismaService } from '@/common';
 import { CreateDeclarationDto } from './dto/create';
 import { ReviewDeclarationDto } from './dto/review';
 import { DeclarationRuleEngineService } from './rule-engine.service';
+import { getEnv } from '@/utils';
 
 const parseId = (value: string, field: string) => {
   if (!/^\d+$/.test(value)) throw new BadRequestException(`${field} must be a numeric id`);
@@ -82,7 +84,7 @@ export class DeclarationsService {
     return this.prisma.declarations.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, name: true, email: true, academicTitle: true } },
+        user: { select: { id: true, name: true, email: true, academicTitle: true, staffCategory: true } },
         academicYear: true,
         source: { include: { classification: true } },
         authors: true,
@@ -94,6 +96,44 @@ export class DeclarationsService {
   private assertOwner(declaration: { userId: bigint }, userId: string, role: ROLE_TYPE) {
     if (role !== ROLE.Admin && declaration.userId.toString() !== userId) {
       throw new ForbiddenException('You cannot modify this declaration');
+    }
+  }
+
+  private async assertActivityAllowed(userId: string, activityType: string) {
+    const user = await this.prisma.users.findUnique({
+      where: { id: parseId(userId, 'userId') },
+      select: { role: true, staffCategory: true },
+    });
+    if (
+      user?.role === ROLE.Staff &&
+      user.staffCategory === STAFF_CATEGORY.Researcher &&
+      activityType !== ACTIVITY_TYPE.RESEARCH
+    ) {
+      throw new ForbiddenException('Nghiên cứu viên chỉ được kê khai hoạt động nghiên cứu khoa học');
+    }
+    if (
+      user?.role === ROLE.Staff &&
+      user.staffCategory === STAFF_CATEGORY.Lecturer &&
+      ![ACTIVITY_TYPE.RESEARCH, ACTIVITY_TYPE.TEACHING].includes(activityType as any)
+    ) {
+      throw new ForbiddenException('Giảng viên chỉ được kê khai hoạt động nghiên cứu và giảng dạy');
+    }
+  }
+
+  private async analyzeEvidence(storagePath: string, originalName: string) {
+    const serviceUrl = getEnv('AI_SERVICE_URL');
+    if (!serviceUrl) return null;
+    try {
+      const buffer = await readFile(storagePath);
+      const form = new FormData();
+      form.append('file', new Blob([buffer], { type: 'application/pdf' }), originalName);
+      const response = await axios.post(`${serviceUrl.replace(/\/$/, '')}/analyze`, form, {
+        timeout: 120_000,
+      });
+      return response.data;
+    } catch {
+      // Uploading evidence must remain available when the optional AI service is down.
+      return null;
     }
   }
 
@@ -129,7 +169,99 @@ export class DeclarationsService {
     return declarations.map(serialize);
   }
 
+  async managerSummary(userId: string, role: ROLE_TYPE) {
+    let where: any = {};
+    if (role === ROLE.Manager) {
+      const tenantId = await this.managerTenantId(userId);
+      where = { user: { tenantId } };
+    } else if (role !== ROLE.Admin) {
+      throw new ForbiddenException('Only managers can access this report');
+    }
+
+    const declarations = await this.prisma.declarations.findMany({
+      where,
+      include: {
+        user: { select: { id: true, name: true, email: true, staffCategory: true, department: true, room: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const statuses = {
+      total: declarations.length,
+      draft: declarations.filter((item) => item.status === DECLARATION_STATUS.DRAFT).length,
+      submitted: declarations.filter((item) => item.status === DECLARATION_STATUS.SUBMITTED).length,
+      approved: declarations.filter((item) => item.status === DECLARATION_STATUS.APPROVED).length,
+      rejected: declarations.filter((item) => item.status === DECLARATION_STATUS.REJECTED).length,
+      calculatedHours: declarations.reduce((sum, item) => sum + (item.calculatedHours ?? 0), 0),
+    };
+
+    const staffMap = new Map<string, any>();
+    const activityMap = new Map<string, any>();
+    const departmentMap = new Map<string, any>();
+    const roomMap = new Map<string, any>();
+    for (const item of declarations) {
+      const staffId = item.user.id.toString();
+      const staff = staffMap.get(staffId) ?? {
+        id: staffId,
+        name: item.user.name,
+        email: item.user.email,
+        staffCategory: item.user.staffCategory,
+        department: item.user.department,
+        room: item.user.room,
+        declarationCount: 0,
+        calculatedHours: 0,
+        submittedCount: 0,
+        approvedCount: 0,
+        rejectedCount: 0,
+      };
+      staff.declarationCount += 1;
+      staff.calculatedHours += item.calculatedHours ?? 0;
+      if (item.status === DECLARATION_STATUS.SUBMITTED) staff.submittedCount += 1;
+      if (item.status === DECLARATION_STATUS.APPROVED) staff.approvedCount += 1;
+      if (item.status === DECLARATION_STATUS.REJECTED) staff.rejectedCount += 1;
+      staffMap.set(staffId, staff);
+
+      const department = item.user.department || 'Chưa phân khoa';
+      const departmentItem = departmentMap.get(department) ?? {
+        department,
+        declarationCount: 0,
+        calculatedHours: 0,
+      };
+      departmentItem.declarationCount += 1;
+      departmentItem.calculatedHours += item.calculatedHours ?? 0;
+      departmentMap.set(department, departmentItem);
+
+      const room = item.user.room || 'Chưa phân phòng/bộ môn';
+      const roomItem = roomMap.get(room) ?? {
+        room,
+        declarationCount: 0,
+        calculatedHours: 0,
+      };
+      roomItem.declarationCount += 1;
+      roomItem.calculatedHours += item.calculatedHours ?? 0;
+      roomMap.set(room, roomItem);
+
+      const activity = activityMap.get(item.activityType) ?? {
+        activityType: item.activityType,
+        declarationCount: 0,
+        calculatedHours: 0,
+      };
+      activity.declarationCount += 1;
+      activity.calculatedHours += item.calculatedHours ?? 0;
+      activityMap.set(item.activityType, activity);
+    }
+
+    return {
+      totals: statuses,
+      staff: [...staffMap.values()].sort((a, b) => b.calculatedHours - a.calculatedHours),
+      activities: [...activityMap.values()].sort((a, b) => b.calculatedHours - a.calculatedHours),
+      departments: [...departmentMap.values()].sort((a, b) => b.calculatedHours - a.calculatedHours),
+      rooms: [...roomMap.values()].sort((a, b) => b.calculatedHours - a.calculatedHours),
+    };
+  }
+
   async create(userId: string, dto: CreateDeclarationDto) {
+    await this.assertActivityAllowed(userId, dto.activityType);
     this.validateAuthorAllocations(dto.authors);
     const academicYearId = parseId(dto.academicYearId, 'academicYearId');
     const sourceId = dto.sourceId ? parseId(dto.sourceId, 'sourceId') : undefined;
@@ -150,6 +282,8 @@ export class DeclarationsService {
         academicYearId,
         activityType: dto.activityType,
         name: dto.name,
+        conversionRuleCode: dto.conversionRuleCode?.trim() || null,
+        quantity: dto.quantity ?? 1,
         publicationYear: dto.publicationYear,
         doi: dto.doi?.trim() || undefined,
         url: dto.url,
@@ -182,6 +316,7 @@ export class DeclarationsService {
     const declaration = await this.findById(id);
     if (!declaration) throw new NotFoundException('Declaration not found');
     this.assertOwner(declaration, userId, role);
+    await this.assertActivityAllowed(userId, dto.activityType);
     if (![DECLARATION_STATUS.DRAFT, DECLARATION_STATUS.REJECTED].includes(declaration.status as any)) {
       throw new BadRequestException('Only draft or rejected declarations can be edited');
     }
@@ -201,6 +336,8 @@ export class DeclarationsService {
       data: {
         activityType: dto.activityType,
         name: dto.name,
+        conversionRuleCode: dto.conversionRuleCode?.trim() || null,
+        quantity: dto.quantity ?? 1,
         publicationYear: dto.publicationYear ?? null,
         doi: dto.doi?.trim() || null,
         url: dto.url?.trim() || null,
@@ -277,6 +414,18 @@ export class DeclarationsService {
       throw error;
     }
 
+    const aiResult = await this.analyzeEvidence(storagePath, originalName);
+    if (aiResult) {
+      await this.prisma.declarations.update({
+        where: { id },
+        data: {
+          aiConfidence: typeof aiResult.confidence === 'number' ? aiResult.confidence : null,
+          aiRawResult: aiResult,
+          aiProcessedAt: new Date(),
+        },
+      });
+    }
+
     if (declaration.evidencePath) await unlink(declaration.evidencePath).catch(() => undefined);
     return serialize(await this.findById(id));
   }
@@ -312,6 +461,7 @@ export class DeclarationsService {
     const declaration = await this.findById(id);
     if (!declaration) throw new NotFoundException('Declaration not found');
     this.assertOwner(declaration, userId, role);
+    await this.assertActivityAllowed(declaration.userId.toString(), declaration.activityType);
     return serialize(await this.ruleEngine.calculate(id));
   }
 
@@ -320,6 +470,7 @@ export class DeclarationsService {
     const declaration = await this.findById(id);
     if (!declaration) throw new NotFoundException('Declaration not found');
     this.assertOwner(declaration, userId, role);
+    await this.assertActivityAllowed(declaration.userId.toString(), declaration.activityType);
 
     if (
       ![DECLARATION_STATUS.DRAFT, DECLARATION_STATUS.REJECTED].includes(declaration.status as any)

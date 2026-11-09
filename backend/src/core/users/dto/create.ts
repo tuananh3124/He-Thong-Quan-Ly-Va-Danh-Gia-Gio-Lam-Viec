@@ -46,4 +46,14 @@ export class CreateUserDto {
   @IsOptional()
   @ApiProperty({ required: false })
   managementRole?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty({ required: false })
+  department?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty({ required: false })
+  room?: string;
 }

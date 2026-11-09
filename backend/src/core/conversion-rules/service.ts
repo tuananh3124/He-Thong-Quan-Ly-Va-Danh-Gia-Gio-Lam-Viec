@@ -13,6 +13,12 @@ const serialize = (rule: any) => ({
   id: rule.id.toString(),
   classificationId: rule.classificationId?.toString() ?? null,
   academicYearId: rule.academicYearId?.toString() ?? null,
+  classification: rule.classification
+    ? { ...rule.classification, id: rule.classification.id.toString() }
+    : rule.classification,
+  academicYear: rule.academicYear
+    ? { ...rule.academicYear, id: rule.academicYear.id.toString() }
+    : rule.academicYear,
 });
 
 @Injectable()
@@ -35,7 +41,12 @@ export class ConversionRulesService {
   async create(dto: CreateConversionRuleDto) {
     const rule = await this.prisma.conversion_rules.create({
       data: {
+        code: dto.code,
+        label: dto.label,
         activityType: dto.activityType,
+        unit: dto.unit,
+        minHours: dto.minHours,
+        maxHours: dto.maxHours,
         classificationId: idOf(dto.classificationId, 'classificationId'),
         academicYearId: idOf(dto.academicYearId, 'academicYearId'),
         hours: dto.hours,

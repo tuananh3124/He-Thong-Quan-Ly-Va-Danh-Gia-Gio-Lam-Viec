@@ -47,6 +47,17 @@ export class CreateDeclarationDto {
   @ApiProperty({ example: 'Tên bài nghiên cứu' })
   name: string;
 
+  @IsString()
+  @IsOptional()
+  @ApiProperty({ required: false, example: 'RESEARCH_ARTICLE_ISI_SCOPUS' })
+  conversionRuleCode?: string;
+
+  @IsNumber()
+  @Min(0.01)
+  @IsOptional()
+  @ApiProperty({ required: false, example: 1, default: 1 })
+  quantity?: number;
+
   @IsInt()
   @Min(1900)
   @Max(2100)
