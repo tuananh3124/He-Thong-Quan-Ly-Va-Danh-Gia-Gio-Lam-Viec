@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { PrismaService } from '@/common';
 import { getEnv } from '@/utils';
 import { ILoginResponseType, ROLE } from '@projectname/shared';
+import { UpdateProfileDto } from './dto/profile';
 
 @Injectable()
 export class AuthService {
@@ -32,18 +33,24 @@ export class AuthService {
     name: string;
     email: string;
     role: string;
+    staffCategory: string | null;
     academicTitle: string | null;
     degree: string | null;
     managementRole: string | null;
+    department: string | null;
+    room: string | null;
   }): ILoginResponseType['user'] {
     return {
       id: user.id.toString(),
       name: user.name,
       email: user.email,
       role: user.role as ILoginResponseType['user']['role'],
+      staffCategory: user.staffCategory as ILoginResponseType['user']['staffCategory'],
       academicTitle: user.academicTitle,
       degree: user.degree,
       managementRole: user.managementRole,
+      department: user.department,
+      room: user.room,
     };
   }
 
@@ -60,7 +67,7 @@ export class AuthService {
           equals: email,
           mode: 'insensitive',
         },
-        role: isAdmin ? ROLE.Admin : ROLE.Staff,
+        role: isAdmin ? ROLE.Admin : { in: [ROLE.Staff, ROLE.Manager] },
       },
     });
 
@@ -128,5 +135,20 @@ export class AuthService {
       user: this.toAuthUser(user),
       permissions: [],
     };
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const user = await this.prisma.users.update({
+      where: { id: BigInt(userId) },
+      data: {
+        name: dto.name?.trim(),
+        academicTitle: dto.academicTitle?.trim() || null,
+        degree: dto.degree?.trim() || null,
+        managementRole: dto.managementRole?.trim() || null,
+        department: dto.department?.trim() || null,
+        room: dto.room?.trim() || null,
+      },
+    });
+    return { user: this.toAuthUser(user), permissions: [] };
   }
 }

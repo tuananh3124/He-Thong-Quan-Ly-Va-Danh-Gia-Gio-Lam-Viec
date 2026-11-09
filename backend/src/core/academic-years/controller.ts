@@ -7,7 +7,7 @@ import { CreateAcademicYearDto } from './dto/create';
 
 @Controller('academic-years')
 @ApiBearerAuth()
-@Roles(ROLE.Staff, ROLE.Admin)
+@Roles(ROLE.Staff, ROLE.Manager, ROLE.Admin)
 export class AcademicYearsController {
   constructor(private readonly academicYearsService: AcademicYearsService) {}
 

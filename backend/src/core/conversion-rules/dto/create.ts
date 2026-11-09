@@ -3,8 +3,23 @@ import { IsDateString, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-
 
 export class CreateConversionRuleDto {
   @IsString()
+  @IsOptional()
+  @ApiProperty({ required: false, example: 'RESEARCH_ARTICLE_ISI_SCOPUS' })
+  code?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty({ required: false, example: 'Bài báo ISI/Scopus' })
+  label?: string;
+
+  @IsString()
   @ApiProperty({ example: 'RESEARCH' })
   activityType: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty({ required: false, example: 'bài báo' })
+  unit?: string;
 
   @IsString()
   @IsOptional()
@@ -20,6 +35,18 @@ export class CreateConversionRuleDto {
   @Min(0)
   @ApiProperty({ example: 1200 })
   hours: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @ApiProperty({ required: false })
+  minHours?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @ApiProperty({ required: false })
+  maxHours?: number;
 
   @IsInt()
   @IsOptional()

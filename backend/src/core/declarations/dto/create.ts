@@ -1,6 +1,16 @@
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 
 export class DeclarationAuthorDto {
   @IsString()
@@ -17,6 +27,13 @@ export class DeclarationAuthorDto {
   @IsOptional()
   @ApiProperty({ required: false, example: '12' })
   userId?: string;
+
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  @ApiProperty({ required: false, minimum: 0, maximum: 100 })
+  allocationPercentage?: number;
 }
 
 export class CreateDeclarationDto {
@@ -29,6 +46,29 @@ export class CreateDeclarationDto {
   @IsNotEmpty()
   @ApiProperty({ example: 'Tên bài nghiên cứu' })
   name: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty({ required: false, example: 'RESEARCH_ARTICLE_ISI_SCOPUS' })
+  conversionRuleCode?: string;
+
+  @IsNumber()
+  @Min(0.01)
+  @IsOptional()
+  @ApiProperty({ required: false, example: 1, default: 1 })
+  quantity?: number;
+
+  @IsInt()
+  @Min(1900)
+  @Max(2100)
+  @IsOptional()
+  @ApiProperty({ required: false, example: 2026 })
+  publicationYear?: number;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty({ required: false, example: '10.1234/example.2026.1' })
+  doi?: string;
 
   @IsString()
   @IsNotEmpty()

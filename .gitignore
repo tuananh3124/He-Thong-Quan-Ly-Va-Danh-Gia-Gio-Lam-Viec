@@ -33,3 +33,6 @@ Dockerfile
 
 #prisma
 generated
+
+# local evidence uploads
+backend/uploads

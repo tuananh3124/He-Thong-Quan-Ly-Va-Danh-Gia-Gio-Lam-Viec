@@ -29,7 +29,10 @@ model users {
 
   academicTitle  String?
   degree         String?
+  staffCategory  String?
   managementRole String?
+  department     String?
+  room           String?
 
   declarations         declarations[]
   declarationAuthors   declaration_authors[]
@@ -82,7 +85,12 @@ model publication_sources {
 
 model conversion_rules {
   id                  BigInt                       @id @default(autoincrement())
+  code                String?
+  label               String?
   activityType        String
+  unit                String?
+  minHours            Float?
+  maxHours            Float?
   classificationId    BigInt?
   classification      publication_classifications? @relation(fields: [classificationId], references: [id])
   academicYearId      BigInt?
@@ -110,7 +118,15 @@ model declarations {
   academicYear        academic_years        @relation(fields: [academicYearId], references: [id])
   activityType        String
   name                String
+  conversionRuleCode  String?
+  quantity            Float                  @default(1)
+  publicationYear     Int?
+  doi                 String?
   url                 String?
+  evidencePath        String?
+  evidenceOriginalName String?
+  evidenceContentType String?
+  evidenceSize        Int?
   sourceId            BigInt?
   source              publication_sources?  @relation(fields: [sourceId], references: [id])
   status              String

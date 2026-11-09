@@ -78,6 +78,13 @@ export const Login = () => {
             Đăng nhập
           </Button>
         </Form.Item>
+
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 0, textAlign: 'center' }}>
+          Quản trị viên?{' '}
+          <Typography.Link onClick={() => navigate('/admin/login')}>
+            Đăng nhập cổng quản trị
+          </Typography.Link>
+        </Typography.Paragraph>
       </Form>
     </Card>
   );

@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post } from '@nestjs/common';
 import { AuthService } from './service';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { Public, Payload, Roles } from '@/common';
 import { LoginUserDto, RefreshTokenDto } from './dto/login';
-import { ILoginResponseType } from '@projectname/shared';
+import { ILoginResponseType, ROLE } from '@projectname/shared';
 import { IPayloadType } from '@/common/decorators/types';
+import { UpdateProfileDto } from './dto/profile';
 
 @Controller('auth')
 export class AuthController {
@@ -37,10 +38,20 @@ export class AuthController {
 
   @Get()
   @ApiBearerAuth()
-  @Roles('Admin', 'Staff')
+  @Roles(ROLE.Admin, ROLE.Manager, ROLE.Staff)
   async auth(@Payload('userId') userId: IPayloadType['userId']) {
     return this.authService.auth({
       userId,
     });
+  }
+
+  @Patch()
+  @ApiBearerAuth()
+  @Roles(ROLE.Admin, ROLE.Manager, ROLE.Staff)
+  updateProfile(
+    @Payload('userId') userId: IPayloadType['userId'],
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(userId, dto);
   }
 }

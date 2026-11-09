@@ -1,13 +1,9 @@
-import { Card, Collapse, Typography } from 'antd';
+import { Card, Collapse } from 'antd';
 import { Page } from '@/components/ui';
 
 export const HelpCenter: React.FC = () => (
   <Page title="Hướng dẫn sử dụng">
     <Card>
-      <Typography.Paragraph type="secondary">
-        Hệ thống giúp bạn kê khai hoạt động, quản lý minh chứng và theo dõi số giờ làm việc tiêu
-        chuẩn.
-      </Typography.Paragraph>
       <Collapse
         items={[
           {
