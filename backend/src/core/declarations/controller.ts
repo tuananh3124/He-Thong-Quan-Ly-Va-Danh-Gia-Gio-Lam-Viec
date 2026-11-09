@@ -20,6 +20,7 @@ import { Payload, Roles } from '@/common';
 import { IPayloadType } from '@/common/decorators/types';
 import { CreateDeclarationDto } from './dto/create';
 import { ReviewDeclarationDto } from './dto/review';
+import { DeclarationUrlMetadataDto } from './dto/url-metadata';
 import { DeclarationsService } from './service';
 
 @Controller('declarations')
@@ -51,6 +52,12 @@ export class DeclarationsController {
   @Roles(ROLE.Staff)
   create(@Payload('userId') userId: IPayloadType['userId'], @Body() dto: CreateDeclarationDto) {
     return this.declarationsService.create(userId, dto);
+  }
+
+  @Post('metadata-from-url')
+  @Roles(ROLE.Staff)
+  metadataFromUrl(@Body() dto: DeclarationUrlMetadataDto) {
+    return this.declarationsService.metadataFromUrl(dto.url);
   }
 
   @Patch(':id')

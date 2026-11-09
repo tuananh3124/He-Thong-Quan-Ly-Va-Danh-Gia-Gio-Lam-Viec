@@ -43,9 +43,9 @@ export class CreateDeclarationDto {
   activityType: string;
 
   @IsString()
-  @IsNotEmpty()
-  @ApiProperty({ example: 'Tên bài nghiên cứu' })
-  name: string;
+  @IsOptional()
+  @ApiProperty({ required: false, example: 'Tên bài nghiên cứu' })
+  name?: string;
 
   @IsString()
   @IsOptional()

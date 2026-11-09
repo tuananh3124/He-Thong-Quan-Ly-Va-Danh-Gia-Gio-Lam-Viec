@@ -137,6 +137,76 @@ export class DeclarationsService {
     }
   }
 
+  async metadataFromUrl(url: string) {
+    const serviceUrl = getEnv('AI_SERVICE_URL');
+    if (!serviceUrl) throw new BadRequestException('AI service is not configured');
+    try {
+      const response = await axios.post(
+        `${serviceUrl.replace(/\/$/, '')}/analyze-url`,
+        { url: url.trim() },
+        { timeout: 30_000 },
+      );
+      return response.data;
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail || 'Cannot analyze publication URL';
+      throw new BadRequestException(detail);
+    }
+  }
+
+  private normalizeSource(value: string) {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  private async matchPublicationSource(sourceName?: string | null) {
+    if (!sourceName) return undefined;
+    const normalized = this.normalizeSource(sourceName);
+    const sources = await this.prisma.publication_sources.findMany();
+    const match = sources.find((source) => {
+      const candidate = this.normalizeSource(source.name);
+      return candidate === normalized || candidate.includes(normalized) || normalized.includes(candidate);
+    });
+    return match?.id;
+  }
+
+  private async enrichFromUrl(dto: CreateDeclarationDto) {
+    if (!dto.url?.trim()) return { dto, metadata: null };
+    let metadata: any = null;
+    try {
+      metadata = await this.metadataFromUrl(dto.url);
+    } catch {
+      // A declaration can still be saved when the external page is unavailable.
+    }
+    if (!metadata) return { dto, metadata: null };
+
+    const metadataAuthors = Array.isArray(metadata.authors)
+      ? metadata.authors.filter(
+          (author: unknown): author is string => typeof author === 'string' && Boolean(author.trim()),
+        )
+      : [];
+    return {
+      metadata,
+      dto: {
+        ...dto,
+        name: dto.name?.trim() || metadata.title || undefined,
+        publicationYear: dto.publicationYear ?? metadata.publication_year ?? undefined,
+        doi: dto.doi?.trim() || metadata.doi || undefined,
+        conversionRuleCode: dto.conversionRuleCode || metadata.suggested_rule_code || undefined,
+        authors:
+          dto.authors?.length
+            ? dto.authors
+            : metadataAuthors.map((author, index) => ({
+                authorName: author,
+                roleType: index === 0 ? 'MAIN_AUTHOR' : 'CO_AUTHOR',
+              })),
+      },
+    };
+  }
+
   async list(userId: string, role: ROLE_TYPE, status?: string) {
     const where: any = { status };
 
@@ -261,10 +331,15 @@ export class DeclarationsService {
   }
 
   async create(userId: string, dto: CreateDeclarationDto) {
+    const enriched = await this.enrichFromUrl(dto);
+    dto = enriched.dto;
+    if (!dto.name?.trim()) throw new BadRequestException('Name is required or must be discoverable from URL');
     await this.assertActivityAllowed(userId, dto.activityType);
     this.validateAuthorAllocations(dto.authors);
     const academicYearId = parseId(dto.academicYearId, 'academicYearId');
-    const sourceId = dto.sourceId ? parseId(dto.sourceId, 'sourceId') : undefined;
+    const sourceId = dto.sourceId
+      ? parseId(dto.sourceId, 'sourceId')
+      : await this.matchPublicationSource(enriched.metadata?.source_name);
 
     const academicYear = await this.prisma.academic_years.findUnique({
       where: { id: academicYearId },
@@ -281,7 +356,7 @@ export class DeclarationsService {
         userId: parseId(userId, 'userId'),
         academicYearId,
         activityType: dto.activityType,
-        name: dto.name,
+        name: dto.name.trim(),
         conversionRuleCode: dto.conversionRuleCode?.trim() || null,
         quantity: dto.quantity ?? 1,
         publicationYear: dto.publicationYear,
@@ -299,6 +374,9 @@ export class DeclarationsService {
               })),
             }
           : undefined,
+        aiConfidence: typeof enriched.metadata?.confidence === 'number' ? enriched.metadata.confidence : null,
+        aiRawResult: enriched.metadata ?? undefined,
+        aiProcessedAt: enriched.metadata ? new Date() : undefined,
       },
       include: {
         user: { select: { id: true, name: true, email: true, academicTitle: true } },
@@ -316,6 +394,9 @@ export class DeclarationsService {
     const declaration = await this.findById(id);
     if (!declaration) throw new NotFoundException('Declaration not found');
     this.assertOwner(declaration, userId, role);
+    const enriched = await this.enrichFromUrl(dto);
+    dto = enriched.dto;
+    if (!dto.name?.trim()) throw new BadRequestException('Name is required or must be discoverable from URL');
     await this.assertActivityAllowed(userId, dto.activityType);
     if (![DECLARATION_STATUS.DRAFT, DECLARATION_STATUS.REJECTED].includes(declaration.status as any)) {
       throw new BadRequestException('Only draft or rejected declarations can be edited');
@@ -323,7 +404,9 @@ export class DeclarationsService {
     this.validateAuthorAllocations(dto.authors);
 
     const academicYearId = parseId(dto.academicYearId, 'academicYearId');
-    const sourceId = dto.sourceId ? parseId(dto.sourceId, 'sourceId') : null;
+    const sourceId = dto.sourceId
+      ? parseId(dto.sourceId, 'sourceId')
+      : (await this.matchPublicationSource(enriched.metadata?.source_name)) ?? null;
     const academicYear = await this.prisma.academic_years.findUnique({ where: { id: academicYearId } });
     if (!academicYear) throw new NotFoundException('Academic year not found');
     if (sourceId) {
@@ -335,7 +418,7 @@ export class DeclarationsService {
       where: { id },
       data: {
         activityType: dto.activityType,
-        name: dto.name,
+        name: dto.name.trim(),
         conversionRuleCode: dto.conversionRuleCode?.trim() || null,
         quantity: dto.quantity ?? 1,
         publicationYear: dto.publicationYear ?? null,
@@ -343,6 +426,9 @@ export class DeclarationsService {
         url: dto.url?.trim() || null,
         academicYearId,
         sourceId,
+        aiConfidence: typeof enriched.metadata?.confidence === 'number' ? enriched.metadata.confidence : null,
+        aiRawResult: enriched.metadata ?? null,
+        aiProcessedAt: enriched.metadata ? new Date() : null,
         calculatedHours: null,
         appliedRuleId: null,
         appliedRuleSnapshot: {},

@@ -75,7 +75,7 @@ export type ReviewDeclarationRequest = {
 
 export type CreateDeclarationRequest = {
   activityType: string;
-  name: string;
+  name?: string;
   academicYearId: string;
   conversionRuleCode?: string;
   quantity?: number;
@@ -84,6 +84,23 @@ export type CreateDeclarationRequest = {
   publicationYear?: number;
   doi?: string;
   authors?: DeclarationAuthorRequest[];
+};
+
+export type DeclarationUrlMetadata = {
+  source_url: string;
+  content_type: string;
+  document_type: string;
+  activity_type: string;
+  suggested_rule_code?: string | null;
+  title?: string | null;
+  authors?: string[];
+  doi?: string | null;
+  publication_year?: number | null;
+  source_name?: string | null;
+  confidence: number;
+  needs_review: boolean;
+  model: string;
+  warnings?: string[];
 };
 
 export type ConversionRule = {
@@ -159,6 +176,17 @@ export const useCreateDeclaration = <
 ) =>
   useHttp<T>({
     url: '/declarations',
+    method: 'post',
+    ...params,
+  });
+
+export const useAnalyzeDeclarationUrl = <
+  T extends IHttpGenerics = { request: { url: string }; response: DeclarationUrlMetadata },
+>(
+  params?: IHttpType<T>,
+) =>
+  useHttp<T>({
+    url: '/declarations/metadata-from-url',
     method: 'post',
     ...params,
   });

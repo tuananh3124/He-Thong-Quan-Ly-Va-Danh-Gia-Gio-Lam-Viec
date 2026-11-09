@@ -240,6 +240,43 @@ export const Declarations = () => {
 
   const saving = createDeclaration.loading || updateDeclaration.loading || evidenceUploading;
 
+  const handlePublicationUrlBlur = async () => {
+    const url = form.getFieldValue('url')?.trim();
+    if (!url || !/^https?:\/\//i.test(url)) return;
+    try {
+      const response = await axios.post(
+        `${apiBaseUrl}/declarations/metadata-from-url`,
+        { url },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const metadata = response.data?.data ?? response.data;
+      if (!metadata) return;
+      const current = form.getFieldsValue();
+      const fields: Partial<CreateDeclarationRequest> = {};
+      if (!current.name && metadata.title) fields.name = metadata.title;
+      if (!current.publicationYear && metadata.publication_year) {
+        fields.publicationYear = metadata.publication_year;
+      }
+      if (!current.doi && metadata.doi) fields.doi = metadata.doi;
+      if (!current.authors?.length && Array.isArray(metadata.authors) && metadata.authors.length) {
+        fields.authors = metadata.authors.map((author: string, index: number) => ({
+          authorName: author,
+          roleType: index === 0 ? 'MAIN_AUTHOR' : 'CO_AUTHOR',
+        }));
+      }
+      if (!current.sourceId && metadata.source_name) {
+        const source = (sources.data ?? []).find(
+          (item) => item.name.toLowerCase() === String(metadata.source_name).toLowerCase(),
+        );
+        if (source) fields.sourceId = source.id;
+      }
+      form.setFieldsValue(fields);
+      toast.success('Đã tự động lấy thông tin từ liên kết bài báo');
+    } catch {
+      toast.error('Không thể lấy metadata từ liên kết này');
+    }
+  };
+
   const handleApprove = () => {
     reviewDeclaration.fetchData({ data: { decision: 'APPROVED' } });
   };
@@ -437,8 +474,8 @@ export const Declarations = () => {
                 );
               }}
             </Form.Item>
-            <Form.Item name="name" label="Tên hoạt động / bài nghiên cứu" rules={[{ required: true }]}>
-              <Input placeholder="Nhập tên hoạt động hoặc tên bài nghiên cứu" />
+            <Form.Item name="name" label="Tên hoạt động / bài nghiên cứu">
+              <Input placeholder="Tự động lấy từ URL nếu để trống" />
             </Form.Item>
             <Form.Item name="academicYearId" label="Năm học" rules={[{ required: true }]}>
               <Select
@@ -461,7 +498,7 @@ export const Declarations = () => {
               />
             </Form.Item>
             <Form.Item name="url" label="URL minh chứng">
-              <Input placeholder="https://..." />
+              <Input placeholder="https://... (rời ô để tự lấy metadata)" onBlur={handlePublicationUrlBlur} />
             </Form.Item>
             {editingEvidenceName ? (
               <Form.Item label="Tệp minh chứng hiện tại">
