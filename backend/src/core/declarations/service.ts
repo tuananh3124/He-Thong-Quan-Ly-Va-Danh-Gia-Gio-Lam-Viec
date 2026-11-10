@@ -445,6 +445,24 @@ export class DeclarationsService {
     return serialize(await this.findById(id));
   }
 
+  async remove(idValue: string, userId: string, role: ROLE_TYPE) {
+    const id = parseId(idValue, 'id');
+    const declaration = await this.findById(id);
+    if (!declaration) throw new NotFoundException('Declaration not found');
+    this.assertOwner(declaration, userId, role);
+    if (![DECLARATION_STATUS.DRAFT, DECLARATION_STATUS.REJECTED].includes(declaration.status as any)) {
+      throw new BadRequestException('Only draft or rejected declarations can be deleted');
+    }
+
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.declaration_authors.deleteMany({ where: { declarationId: id } });
+      await transaction.declarations.delete({ where: { id } });
+    });
+
+    if (declaration.evidencePath) await unlink(declaration.evidencePath).catch(() => undefined);
+    return { id: id.toString(), deleted: true };
+  }
+
   private validateAuthorAllocations(authors?: CreateDeclarationDto['authors']) {
     if (!authors?.length) return;
     const specified = authors.filter((author) => author.allocationPercentage != null);

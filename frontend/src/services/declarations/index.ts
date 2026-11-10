@@ -91,6 +91,11 @@ export type DeclarationUrlMetadata = {
   content_type: string;
   document_type: string;
   activity_type: string;
+  reference_table?: string | null;
+  publication_item_code?: string | null;
+  publication_item_label?: string | null;
+  publication_category?: string | null;
+  classification_reason?: string | null;
   suggested_rule_code?: string | null;
   title?: string | null;
   authors?: string[];
@@ -200,6 +205,18 @@ export const useUpdateDeclaration = <
   useHttp<T>({
     url: `/declarations/${id}`,
     method: 'patch',
+    ...params,
+  });
+
+export const useDeleteDeclaration = <
+  T extends IHttpGenerics = { request: undefined; response: { id: string; deleted: boolean } },
+>(
+  id: string,
+  params?: IHttpType<T>,
+) =>
+  useHttp<T>({
+    url: `/declarations/${id}`,
+    method: 'delete',
     ...params,
   });
 

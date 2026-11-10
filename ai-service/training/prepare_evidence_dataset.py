@@ -16,6 +16,24 @@ from pypdf import PdfReader
 
 
 LABEL_IDS = {"RESEARCH": 0, "TEACHING": 1, "KNOWLEDGE_TRANSFER": 2, "OTHER": 3}
+REFERENCE_LABEL_IDS = {
+    "PUBLICATION_1_1": 0,
+    "PUBLICATION_1_4": 1,
+    "PUBLICATION_1_5": 2,
+    "PUBLICATION_2_2": 3,
+    "TEACHING": 4,
+    "OTHER": 5,
+}
+RULE_TO_REFERENCE_CODE = {
+    "RESEARCH_ARTICLE_ISI_SCOPUS": "1.1",
+    "RESEARCH_ARTICLE_FOREIGN_OTHER": "1.2",
+    "RESEARCH_ARTICLE_VNU_SCOPUS_SECTION": "1.3",
+    "RESEARCH_ARTICLE_DOMESTIC_05": "1.4",
+    "RESEARCH_ARTICLE_DOMESTIC_1": "1.5",
+    "RESEARCH_CONFERENCE_ISI_SCOPUS": "2.1",
+    "RESEARCH_CONFERENCE_INTERNATIONAL_REVIEWED": "2.2",
+    "RESEARCH_CONFERENCE_NATIONAL_ISBN": "2.3",
+}
 NER_LABELS = [
     "O",
     "B-TITLE", "I-TITLE",
@@ -31,37 +49,37 @@ OVERRIDES = {
     "Quan_ly_nuoc_Tay_Nung.pdf": {
         "label": "RESEARCH", "title": "Indigenous water governance in a China-Vietnam borderland: ethnographic insights from Nung and Tay communities",
         "authors": ["Ly Viet Truong"], "source_name": "Journal of Ethnobiology and Ethnomedicine", "publication_year": 2026,
-        "doi": "10.1186/s13002-026-00867-8", "rule_code": "RESEARCH_ARTICLE_ISI_SCOPUS",
+        "doi": "10.1186/s13002-026-00867-8", "rule_code": "RESEARCH_ARTICLE_ISI_SCOPUS", "reference_item_code": "1.1",
     },
     "Thuc_vat_nghi_le_Tay_Nung.pdf": {
         "label": "RESEARCH", "title": "Ethnographic research on plant species used in ritual festivals of the Nung people in the northern mountainous region of Vietnam",
         "authors": ["Ly Viet Truong"], "source_name": "Journal of Ethnobiology and Ethnomedicine", "publication_year": 2026,
-        "doi": "10.1186/s13002-026-00894-5", "rule_code": "RESEARCH_ARTICLE_ISI_SCOPUS",
+        "doi": "10.1186/s13002-026-00894-5", "rule_code": "RESEARCH_ARTICLE_ISI_SCOPUS", "reference_item_code": "1.1",
     },
     "Chu_the_thuc_hanh_di_san_bia_muc_luc_bai_viet.pdf": {
         "label": "RESEARCH", "title": "Chủ thể thực hành và bảo vệ di sản tín ngưỡng Nùng, Tày (Trường hợp người thực hành Then trẻ tuổi ở Lạng Sơn)",
         "authors": ["Lý Viết Trường"], "source_name": "Tạp chí Khoa học Xã hội và Nhân văn", "publication_year": 2026,
-        "doi": "10.33100/vjossh.2026.12.1.5", "rule_code": "RESEARCH_ARTICLE_DOMESTIC_1",
+        "doi": "10.33100/vjossh.2026.12.1.5", "rule_code": "RESEARCH_ARTICLE_DOMESTIC_1", "reference_item_code": "1.5",
     },
     "Tu_nuong_ray_den_rung_trong.pdf": {
         "label": "RESEARCH", "title": "Từ nương rẫy đến rừng trồng: chuyển dịch sinh kế của người Nùng, Tày ở vùng Đông Bắc tỉnh Lạng Sơn",
         "authors": ["Lý Viết Trường"], "source_name": "Tạp chí Khoa học xã hội Việt Nam", "publication_year": 2026,
-        "rule_code": "RESEARCH_ARTICLE_DOMESTIC_1",
+        "rule_code": "RESEARCH_ARTICLE_DOMESTIC_1", "reference_item_code": "1.5",
     },
     "Bieu tuong tet mung 3 thang 3.pdf": {
         "label": "RESEARCH", "title": "Biểu tượng văn hóa trong Tết mùng 3 tháng Ba của người Nùng, Tày ở Lạng Sơn",
         "authors": ["Lý Viết Trường"], "source_name": "Đặc san Di sản văn hóa", "publication_year": 2026,
-        "rule_code": "RESEARCH_ARTICLE_DOMESTIC_05",
+        "rule_code": "RESEARCH_ARTICLE_DOMESTIC_05", "reference_item_code": "1.4",
     },
     "Tu tin nguong dan gian den y thuc chu quyen Tay Nung.pdf": {
         "label": "RESEARCH", "title": "Từ tín ngưỡng dân gian đến ý thức chủ quyền: Nghiên cứu tục thờ Thổ công của người Nùng, Tày ở vùng Đông Bắc tỉnh Lạng Sơn",
         "authors": ["Lý Viết Trường"], "source_name": "Tạp chí Nghiên cứu Văn hóa", "publication_year": 2026,
-        "rule_code": "RESEARCH_ARTICLE_DOMESTIC_1",
+        "rule_code": "RESEARCH_ARTICLE_DOMESTIC_1", "reference_item_code": "1.5",
     },
     "Thieng hoa khong gian Tho cong - Ly Viet Truong.pdf": {
         "label": "RESEARCH", "title": "Thiêng hóa không gian cư trú qua tín ngưỡng thờ Thổ công của người Nùng, Tày ở vùng Đông Bắc tỉnh Lạng Sơn",
         "authors": ["Lý Viết Trường"], "source_name": "Kỷ yếu hội thảo khoa học quốc tế Ngôn ngữ học và Việt Nam học trong kỷ nguyên mới",
-        "publication_year": 2026, "rule_code": "RESEARCH_CONFERENCE_INTERNATIONAL_REVIEWED",
+        "publication_year": 2026, "rule_code": "RESEARCH_CONFERENCE_INTERNATIONAL_REVIEWED", "reference_item_code": "2.2",
     },
     "Phiếu đánh giá PĐA, VKC 2026.pdf": {
         "label": "OTHER", "title": "Phiếu đánh giá, xếp loại chất lượng cán bộ lãnh đạo, quản lý năm 2025",
@@ -114,12 +132,16 @@ def docx_records(path: Path, root: Path) -> list[dict]:
             year_match = re.search(r"\b((?:19|20)\d{2})\b", publication)
             doi_match = re.search(r"10\.\d{4,9}/[-._;()/:A-Z0-9]+", source, re.I)
             authors = ["Lý Viết Trường"]
+            rule_code = "RESEARCH_CONFERENCE_INTERNATIONAL_REVIEWED" if "Ngôn ngữ học và Việt Nam học" in source else (
+                "RESEARCH_ARTICLE_ISI_SCOPUS" if "Scopus" in source else "RESEARCH_ARTICLE_DOMESTIC_1"
+            )
             metadata = {
                 "title": title, "authors": authors, "source_name": source,
                 "publication_year": int(year_match.group(1)) if year_match else None,
                 "doi": doi_match.group(0).rstrip(".,;") if doi_match else None,
                 "role": role, "quality": quality,
-                "rule_code": "RESEARCH_ARTICLE_ISI_SCOPUS" if "Scopus" in source else "RESEARCH_ARTICLE_DOMESTIC_1",
+                "rule_code": rule_code,
+                "reference_item_code": RULE_TO_REFERENCE_CODE.get(rule_code),
             }
             text = clean_text("\n".join(f"{label}: {value}" for label, value in zip(
                 ("title", "source", "publication", "quality", "role"), values)))
@@ -139,7 +161,7 @@ def docx_records(path: Path, root: Path) -> list[dict]:
         "id": path.stem.lower().replace(" ", "-")[:80], "source_file": str(path.relative_to(root)), "text": text,
         "label": "TEACHING", "label_id": LABEL_IDS["TEACHING"], "label_origin": "manual_seed",
         "text_quality": "text", "needs_ocr": False,
-        "metadata": {"title": path.stem, "rule_code": "TEACHING_ACTIVITY"}, "pages": None,
+        "metadata": {"title": path.stem, "rule_code": "TEACHING_ACTIVITY", "reference_item_code": None}, "pages": None,
     }]
 
 
@@ -163,6 +185,16 @@ def token_ner_record(record: dict) -> dict:
     return {"id": record["id"], "tokens": tokens, "ner_tags": [NER_IDS[label] for label in labels]}
 
 
+def reference_label(record: dict) -> tuple[str, int]:
+    code = record.get("metadata", {}).get("reference_item_code")
+    if code:
+        label = f"PUBLICATION_{code.replace('.', '_').upper()}"
+        if label in REFERENCE_LABEL_IDS:
+            return label, REFERENCE_LABEL_IDS[label]
+    label = record["label"] if record["label"] in {"TEACHING", "OTHER"} else "OTHER"
+    return label, REFERENCE_LABEL_IDS[label]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, type=Path)
@@ -177,6 +209,10 @@ def main() -> None:
             records.append(pdf_record(path, args.input))
         elif path.suffix.lower() == ".docx":
             records.extend(docx_records(path, args.input))
+    for record in records:
+        label, label_id = reference_label(record)
+        record["reference_label"] = label
+        record["reference_label_id"] = label_id
     with (args.output / "evidence_classification.jsonl").open("w", encoding="utf-8") as stream:
         for record in records:
             stream.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -186,7 +222,7 @@ def main() -> None:
     summary = {
         "records": len(records), "labels": {label: sum(item["label"] == label for item in records) for label in LABEL_IDS},
         "needs_ocr": sum(item["needs_ocr"] for item in records),
-        "label_ids": LABEL_IDS, "ner_labels": NER_LABELS,
+        "label_ids": LABEL_IDS, "reference_label_ids": REFERENCE_LABEL_IDS, "ner_labels": NER_LABELS,
         "source_root": str(args.input), "generated_from": [item["source_file"] for item in records],
     }
     (args.output / "manifest.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")

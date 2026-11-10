@@ -7,6 +7,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Popconfirm,
   Select,
   Space,
   Table,
@@ -31,6 +32,7 @@ import {
   useAcademicYears,
   useCalculateDeclaration,
   useCreateDeclaration,
+  useDeleteDeclaration,
   useConversionRules,
   useDeclarations,
   usePublicationSources,
@@ -76,6 +78,7 @@ export const Declarations = () => {
   const [reviewing, setReviewing] = useState<Declaration | null>(null);
   const [rejecting, setRejecting] = useState(false);
   const [action, setAction] = useState<{ id: string; type: 'calculate' | 'submit' } | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [form] = Form.useForm<CreateDeclarationRequest>();
   const [reviewForm] = Form.useForm<ReviewDeclarationRequest>();
   const declarations = useDeclarations({
@@ -84,6 +87,20 @@ export const Declarations = () => {
   const academicYears = useAcademicYears();
   const sources = usePublicationSources();
   const conversionRules = useConversionRules();
+  const watchedActivityType = Form.useWatch('activityType', form);
+  const watchedSourceId = Form.useWatch('sourceId', form);
+  const watchedUrl = Form.useWatch('url', form);
+  const selectedSource = (sources.data ?? []).find((item) => item.id === watchedSourceId);
+  const activeAcademicYear =
+    academicYears.data?.find((year) => year.isActive) ?? academicYears.data?.[0];
+  const availableConversionRules = (conversionRules.data ?? []).filter(
+    (rule) =>
+      rule.activityType === watchedActivityType &&
+      (!rule.classificationId || rule.classificationId === selectedSource?.classificationId),
+  );
+  const fixedPublicationQuantity =
+    watchedActivityType === ACTIVITY_TYPE.RESEARCH &&
+    (Boolean(watchedUrl?.trim()) || evidenceFileList.length > 0);
   const visibleActivityOptions = user?.staffCategory === STAFF_CATEGORY.Researcher
     ? activityOptions.filter((item) => item.value === ACTIVITY_TYPE.RESEARCH)
     : user?.staffCategory === STAFF_CATEGORY.Lecturer
@@ -133,6 +150,7 @@ export const Declarations = () => {
   });
   const calculateDeclaration = useCalculateDeclaration(action?.id ?? '', { showLoading: false });
   const submitDeclaration = useSubmitDeclaration(action?.id ?? '', { showLoading: false });
+  const deleteDeclaration = useDeleteDeclaration(deletingId ?? '', { showLoading: false });
   const reviewDeclaration = useReviewDeclaration(reviewing?.id ?? '', {
     showLoading: false,
     success: {
@@ -160,6 +178,26 @@ export const Declarations = () => {
   }, [isManager]);
 
   useEffect(() => {
+    const refreshVisibleData = () => {
+      if (document.visibilityState === 'visible') declarations.fetchData();
+    };
+    const interval = window.setInterval(refreshVisibleData, 15000);
+    window.addEventListener('focus', refreshVisibleData);
+    document.addEventListener('visibilitychange', refreshVisibleData);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshVisibleData);
+      document.removeEventListener('visibilitychange', refreshVisibleData);
+    };
+  }, [isManager]);
+
+  useEffect(() => {
+    if (isManager || editingId || !activeAcademicYear) return;
+    form.setFieldsValue({ academicYearId: activeAcademicYear.id });
+  }, [activeAcademicYear?.id, editingId, isManager]);
+
+  useEffect(() => {
     if (!action) return;
 
     const request = action.type === 'calculate' ? calculateDeclaration : submitDeclaration;
@@ -168,6 +206,19 @@ export const Declarations = () => {
       declarations.fetchData();
     });
   }, [action]);
+
+  useEffect(() => {
+    if (!deletingId) return;
+
+    deleteDeclaration.fetchData().then(() => {
+      toast.success('Đã xóa bản kê khai');
+    }).catch(() => {
+      toast.error('Không thể xóa bản kê khai');
+    }).finally(() => {
+      setDeletingId(null);
+      declarations.fetchData();
+    });
+  }, [deletingId]);
 
   const handleSave = (values: CreateDeclarationRequest) => {
     if (editingId) {
@@ -234,7 +285,10 @@ export const Declarations = () => {
     setEditingEvidenceName(null);
     setEvidenceFileList([]);
     form.resetFields();
-    form.setFieldsValue({ quantity: 1 });
+    form.setFieldsValue({
+      quantity: 1,
+      academicYearId: activeAcademicYear?.id,
+    });
     setOpen(true);
   };
 
@@ -253,11 +307,20 @@ export const Declarations = () => {
       if (!metadata) return;
       const current = form.getFieldsValue();
       const fields: Partial<CreateDeclarationRequest> = {};
+      if (!current.activityType && metadata.activity_type) {
+        fields.activityType = metadata.activity_type as CreateDeclarationRequest['activityType'];
+      }
       if (!current.name && metadata.title) fields.name = metadata.title;
       if (!current.publicationYear && metadata.publication_year) {
         fields.publicationYear = metadata.publication_year;
       }
       if (!current.doi && metadata.doi) fields.doi = metadata.doi;
+      if (!current.conversionRuleCode && metadata.suggested_rule_code) {
+        fields.conversionRuleCode = metadata.suggested_rule_code;
+      }
+      if (metadata.activity_type === ACTIVITY_TYPE.RESEARCH || metadata.publication_item_code) {
+        fields.quantity = 1;
+      }
       if (!current.authors?.length && Array.isArray(metadata.authors) && metadata.authors.length) {
         fields.authors = metadata.authors.map((author: string, index: number) => ({
           authorName: author,
@@ -271,7 +334,10 @@ export const Declarations = () => {
         if (source) fields.sourceId = source.id;
       }
       form.setFieldsValue(fields);
-      toast.success('Đã tự động lấy thông tin từ liên kết bài báo');
+      const item = metadata.publication_item_code
+        ? ` Mục tham chiếu: ${metadata.publication_item_code}${metadata.publication_item_label ? ` - ${metadata.publication_item_label}` : ''}.`
+        : '';
+      toast.success(`Đã tự động lấy thông tin từ liên kết bài báo.${item}`);
     } catch {
       toast.error('Không thể lấy metadata từ liên kết này');
     }
@@ -298,7 +364,7 @@ export const Declarations = () => {
       title={isManager ? 'Duyệt kê khai' : 'Kê khai hoạt động'}
       actions={
         <Space>
-          <Button icon={<ReloadOutlined />} onClick={loadData} />
+          <Button title="Làm mới trạng thái" icon={<ReloadOutlined />} onClick={loadData} />
           {!isManager ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
               Tạo kê khai
@@ -340,7 +406,7 @@ export const Declarations = () => {
               visibleActivityOptions.find((item) => item.value === value)?.label ?? value,
           },
           {
-            title: 'Trạng thái',
+            title: 'Trạng thái duyệt',
             dataIndex: 'status',
             key: 'status',
             render: (value: string) => (
@@ -376,6 +442,24 @@ export const Declarations = () => {
                     <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
                       Sửa
                     </Button>
+                  ) : null}
+                  {record.status === 'DRAFT' || record.status === 'REJECTED' ? (
+                    <Popconfirm
+                      title="Xóa bản kê khai?"
+                      description="Thao tác này không thể hoàn tác."
+                      okText="Xóa"
+                      cancelText="Hủy"
+                      onConfirm={() => setDeletingId(record.id)}
+                    >
+                      <Button
+                        size="small"
+                        danger
+                        loading={deletingId === record.id}
+                        icon={<DeleteOutlined />}
+                      >
+                        Xóa
+                      </Button>
+                    </Popconfirm>
                   ) : null}
                   {record.hasEvidence ? (
                     <Button
@@ -424,67 +508,42 @@ export const Declarations = () => {
                 }}
               />
             </Form.Item>
+            <Form.Item name="conversionRuleCode" label="Quy tắc quy đổi">
+              <Select
+                showSearch
+                optionFilterProp="label"
+                loading={conversionRules.loading}
+                placeholder="AI tự đề xuất từ URL hoặc PDF nếu để trống"
+                options={availableConversionRules.map((rule: ConversionRule) => ({
+                  value: rule.code ?? rule.id,
+                  label: `${rule.label ?? rule.code ?? 'Quy tắc'}${rule.classification?.name ? ` (${rule.classification.name})` : ''} · ${rule.minHours != null || rule.maxHours != null ? `${rule.minHours ?? rule.hours}–${rule.maxHours ?? rule.hours}` : rule.hours} giờ${rule.unit ? `/${rule.unit}` : ''}`,
+                }))}
+              />
+            </Form.Item>
             <Form.Item
-              noStyle
-              shouldUpdate={(previous, current) =>
-                previous.activityType !== current.activityType || previous.sourceId !== current.sourceId
+              name="quantity"
+              label="Số lượng"
+              rules={[{ required: true, message: 'Nhập số lượng' }]}
+              extra={
+                fixedPublicationQuantity
+                  ? 'Ấn phẩm khoa học từ link/PDF luôn có số lượng cố định là 1.'
+                  : availableConversionRules.length
+                    ? 'Giờ quy đổi = định mức của rule × số lượng.'
+                    : 'Chưa có rule cho loại hoạt động này.'
               }
             >
-              {({ getFieldValue }) => {
-                const activityType = getFieldValue('activityType');
-                const source = (sources.data ?? []).find(
-                  (item) => item.id === getFieldValue('sourceId'),
-                );
-                const rules = (conversionRules.data ?? []).filter(
-                  (rule) =>
-                    rule.activityType === activityType &&
-                    (!rule.classificationId || rule.classificationId === source?.classificationId),
-                );
-                return (
-                  <>
-                    <Form.Item
-                      name="conversionRuleCode"
-                      label="Quy tắc quy đổi"
-                    >
-                      <Select
-                        showSearch
-                        optionFilterProp="label"
-                        loading={conversionRules.loading}
-                        placeholder="AI tự đề xuất từ URL hoặc PDF nếu để trống"
-                        options={rules.map((rule: ConversionRule) => ({
-                          value: rule.code ?? rule.id,
-                          label: `${rule.label ?? rule.code ?? 'Quy tắc'}${rule.classification?.name ? ` (${rule.classification.name})` : ''} · ${rule.minHours != null || rule.maxHours != null ? `${rule.minHours ?? rule.hours}–${rule.maxHours ?? rule.hours}` : rule.hours} giờ${rule.unit ? `/${rule.unit}` : ''}`,
-                        }))}
-                      />
-                    </Form.Item>
-                    <Form.Item
-                      name="quantity"
-                      label="Số lượng"
-                      rules={[{ required: true, message: 'Nhập số lượng' }]}
-                      extra={
-                        rules.length
-                          ? 'Giờ quy đổi = định mức của rule × số lượng.'
-                          : 'Chưa có rule cho loại hoạt động này.'
-                      }
-                    >
-                      <InputNumber min={0.01} precision={2} style={{ width: '100%' }} />
-                    </Form.Item>
-                  </>
-                );
-              }}
+              <InputNumber
+                min={fixedPublicationQuantity ? 1 : 0.01}
+                max={fixedPublicationQuantity ? 1 : undefined}
+                precision={fixedPublicationQuantity ? 0 : 2}
+                disabled={fixedPublicationQuantity}
+                style={{ width: '100%' }}
+              />
             </Form.Item>
             <Form.Item name="name" label="Tên hoạt động / bài nghiên cứu">
               <Input placeholder="Tự động lấy từ URL nếu để trống" />
             </Form.Item>
-            <Form.Item name="academicYearId" label="Năm học" rules={[{ required: true }]}>
-              <Select
-                placeholder="Chọn năm học"
-                options={(academicYears.data ?? []).map((year) => ({
-                  value: year.id,
-                  label: year.name,
-                }))}
-              />
-            </Form.Item>
+            <Form.Item name="academicYearId" hidden rules={[{ required: true }]} />
             <Form.Item name="sourceId" label="Nguồn công bố">
               <Select
                 allowClear

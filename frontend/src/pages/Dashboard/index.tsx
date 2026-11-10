@@ -29,6 +29,8 @@ const statusLabel: Record<string, string> = {
   REJECTED: 'Cần bổ sung',
 };
 
+const ANNUAL_TARGET_HOURS = 1760;
+
 export const Dashboard = () => {
   const navigate = useNavigate();
   const declarations = useDeclarations();
@@ -37,6 +39,19 @@ export const Dashboard = () => {
   useEffect(() => {
     declarations.fetchData();
     academicYears.fetchData();
+
+    const refreshVisibleData = () => {
+      if (document.visibilityState === 'visible') declarations.fetchData();
+    };
+    const interval = window.setInterval(refreshVisibleData, 15000);
+    window.addEventListener('focus', refreshVisibleData);
+    document.addEventListener('visibilitychange', refreshVisibleData);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshVisibleData);
+      document.removeEventListener('visibilitychange', refreshVisibleData);
+    };
   }, []);
 
   const items = declarations.data ?? [];
@@ -44,6 +59,11 @@ export const Dashboard = () => {
   const submittedCount = items.filter((item) => item.status === 'SUBMITTED').length;
   const approvedCount = items.filter((item) => item.status === 'APPROVED').length;
   const progress = items.length ? Math.round((approvedCount / items.length) * 100) : 0;
+  const remainingHours = Math.max(ANNUAL_TARGET_HOURS - totalHours, 0);
+  const hoursProgress = Math.min(
+    Math.round((totalHours / ANNUAL_TARGET_HOURS) * 100),
+    100,
+  );
 
   return (
     <div className="dashboard-page">
@@ -106,6 +126,40 @@ export const Dashboard = () => {
             </Card>
           </Col>
         </Row>
+
+        <Card className="section-card" title="Tiến độ giờ làm việc" style={{ marginBottom: 16 }}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={8}>
+              <Statistic title="Đã có" value={totalHours} precision={2} suffix="giờ" />
+            </Col>
+            <Col xs={24} md={8}>
+              <Statistic
+                title="Định mức năm học"
+                value={ANNUAL_TARGET_HOURS}
+                suffix="giờ"
+              />
+            </Col>
+            <Col xs={24} md={8}>
+              <Statistic
+                title="Còn thiếu để hoàn thành"
+                value={remainingHours}
+                precision={2}
+                suffix="giờ"
+                styles={{ content: { color: remainingHours ? '#d46b08' : '#2f855a' } }}
+              />
+            </Col>
+          </Row>
+          <Flex vertical gap="small" style={{ marginTop: 20 }}>
+            <Flex justify="space-between">
+              <Typography.Text strong>Tiến độ hoàn thành</Typography.Text>
+              <Typography.Text type="secondary">{hoursProgress}%</Typography.Text>
+            </Flex>
+            <Progress percent={hoursProgress} strokeColor="#1769aa" />
+            <Typography.Text type="secondary">
+              Theo định mức tổng 1.760 giờ làm việc trong năm học.
+            </Typography.Text>
+          </Flex>
+        </Card>
 
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={14}>

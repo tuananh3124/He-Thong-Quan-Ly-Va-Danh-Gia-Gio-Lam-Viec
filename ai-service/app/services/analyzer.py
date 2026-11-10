@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from app.config import get_settings
 from app.schemas import EvidenceAnalyzeResponse, EvidenceField
 from app.services.openai_client import get_client
+from app.services.publication_reference import classify_publication_item, item_from_code
 
 
 @dataclass
@@ -153,7 +154,8 @@ def _llm_predict(text: str) -> dict | None:
 Phân tích nội dung minh chứng học thuật dưới đây. Chỉ trả về một JSON object,
 không markdown, theo đúng các trường:
 document_type, activity_type, suggested_rule_code, title, authors, doi,
-publication_year, source_name, classification, confidence, needs_review.
+publication_year, source_name, classification, confidence, needs_review,
+publication_item_code, publication_item_label.
 
 activity_type chỉ được là RESEARCH, TEACHING, KNOWLEDGE_TRANSFER hoặc OTHER.
 confidence là số thực từ 0 đến 1. authors là mảng chuỗi. Nếu không xác định
@@ -201,6 +203,7 @@ def analyze_pdf(data: bytes) -> EvidenceAnalyzeResponse:
         }.get(activity, rule)
         document_type = "PUBLICATION" if activity == "RESEARCH" else "ACTIVITY_RECORD"
     title, authors, doi, year, source, evidence = _extract_fields(pages, _xlmr_entities(text))
+    publication = classify_publication_item(text, source, title)
     llm_result = _llm_predict(text)
     if llm_result:
         predicted_activity = str(llm_result.get("activity_type") or activity).upper()
@@ -214,10 +217,36 @@ def analyze_pdf(data: bytes) -> EvidenceAnalyzeResponse:
         year = llm_result.get("publication_year") or year
         source = llm_result.get("source_name") or source
         confidence = max(0.0, min(1.0, float(llm_result.get("confidence", confidence))))
+        llm_item = item_from_code(str(llm_result.get("publication_item_code") or ""))
+        if llm_item:
+            publication = {
+                **publication,
+                "publication_item_code": llm_item["publication_item_code"],
+                "publication_item_label": llm_item["label"],
+                "publication_category": llm_item["category"],
+                "suggested_rule_code": llm_item["rule_code"],
+                "confidence": max(publication["confidence"], confidence),
+                "needs_review": confidence < get_settings().analyzer_min_confidence,
+                "classification_reason": "Mô hình LLM đã xác nhận dòng trong Bảng 1.",
+            }
         model_name = f"OpenAICompatible:{get_settings().openai_chat_model}"
+    if publication["publication_item_code"]:
+        activity = "RESEARCH"
+        document_type = "PUBLICATION"
+        rule = publication["suggested_rule_code"] or rule
+        confidence = min(confidence, publication["confidence"])
+    elif activity == "RESEARCH":
+        # Do not emit a generic code that does not exist in Table 1.
+        # The declaration must be reviewed until the exact row is known.
+        rule = None
     return EvidenceAnalyzeResponse(
         document_type=document_type,
         activity_type=activity,
+        reference_table=publication["reference_table"],
+        publication_item_code=publication["publication_item_code"],
+        publication_item_label=publication["publication_item_label"],
+        publication_category=publication["publication_category"],
+        classification_reason=publication["classification_reason"],
         suggested_rule_code=rule,
         title=title,
         authors=authors,
@@ -226,7 +255,7 @@ def analyze_pdf(data: bytes) -> EvidenceAnalyzeResponse:
         source_name=source,
         classification=source,
         confidence=round(confidence, 4),
-        needs_review=confidence < get_settings().analyzer_min_confidence,
+        needs_review=confidence < get_settings().analyzer_min_confidence or publication["needs_review"],
         model=model_name,
         evidence=evidence,
     )
