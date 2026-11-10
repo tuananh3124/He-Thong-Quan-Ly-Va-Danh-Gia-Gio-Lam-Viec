@@ -50,6 +50,11 @@ class EvidenceField(BaseModel):
 class EvidenceAnalyzeResponse(BaseModel):
     document_type: str
     activity_type: str
+    reference_table: str | None = None
+    publication_item_code: str | None = None
+    publication_item_label: str | None = None
+    publication_category: str | None = None
+    classification_reason: str | None = None
     suggested_rule_code: str | None = None
     title: str | None = None
     authors: list[str] = Field(default_factory=list)

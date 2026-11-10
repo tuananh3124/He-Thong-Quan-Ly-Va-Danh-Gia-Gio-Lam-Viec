@@ -12,6 +12,7 @@ from urllib.parse import urljoin, urlparse
 import httpx
 
 from app.services.analyzer import analyze_pdf
+from app.services.publication_reference import classify_publication_item
 
 
 class _MetadataParser(HTMLParser):
@@ -138,21 +139,28 @@ def _extract_html(url: str, body: bytes) -> dict:
     source_name = source_name or site_name
 
     fields_found = sum(bool(value) for value in (title, authors, doi, publication_year, source_name))
-    confidence = min(0.98, 0.45 + fields_found * 0.10)
+    metadata_confidence = min(0.98, 0.45 + fields_found * 0.10)
+    publication = classify_publication_item(page_text, source_name, title)
+    confidence = min(metadata_confidence, publication["confidence"])
     return {
         "source_url": url,
         "content_type": "text/html",
         "document_type": "PUBLICATION",
         "activity_type": "RESEARCH",
-        "suggested_rule_code": "RESEARCH_PUBLICATION",
+        "reference_table": publication["reference_table"],
+        "publication_item_code": publication["publication_item_code"],
+        "publication_item_label": publication["publication_item_label"],
+        "publication_category": publication["publication_category"],
+        "classification_reason": publication["classification_reason"],
+        "suggested_rule_code": publication["suggested_rule_code"],
         "title": title,
         "authors": authors,
         "doi": doi,
         "publication_year": publication_year,
         "source_name": source_name,
-        "classification": source_name,
+        "classification": publication["publication_item_code"] or source_name,
         "confidence": round(confidence, 4),
-        "needs_review": confidence < 0.75,
+        "needs_review": confidence < 0.70 or publication["needs_review"],
         "model": "url-metadata-v1",
         "warnings": [] if fields_found >= 3 else ["Some metadata fields could not be verified from the page"],
     }

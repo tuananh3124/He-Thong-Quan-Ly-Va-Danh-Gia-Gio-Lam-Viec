@@ -15,17 +15,20 @@ và tạo thêm bộ BIO cho bài toán nhận dạng thực thể. Tài liệu 
 được đánh dấu `needs_ocr=true` để không biến dữ liệu rỗng thành nhãn giả.
 
 Đây là mô hình mới của bài toán, không phải tên thư viện: `EvidenceXLMR` = `FacebookAI/xlm-roberta-base` + đầu phân loại hoặc đầu gán nhãn token được fine-tune trên dữ liệu minh chứng của dự án.
+Nhãn phân loại nghiên cứu được gắn với mã dòng trong `Bảng 1` của sheet `Tham chieu`, ví dụ
+`PUBLICATION_1_1`, `PUBLICATION_1_4`, `PUBLICATION_1_5`, `PUBLICATION_2_1`,
+`PUBLICATION_2_2` và `PUBLICATION_2_3`. Mỗi mã ánh xạ trực tiếp sang luật quy đổi tương ứng.
 
 ## Hai nhiệm vụ
 
-1. Phân loại tài liệu: `RESEARCH`, `TEACHING`, `KNOWLEDGE_TRANSFER`, `OTHER`.
+1. Phân loại tài liệu: mã dòng trong Bảng 1 như `1.1` đến `2.3`, cùng `TEACHING` và `OTHER` cho tài liệu ngoài Bảng 1.
 2. Trích xuất trường: BIO tags như `B-TITLE`, `I-TITLE`, `B-AUTHOR`, `B-DOI`, `B-YEAR`, `B-SOURCE`.
 
 Ví dụ huấn luyện:
 
 ```powershell
 pip install -r requirements-ml.txt
-python training/train_xlmr.py --data data/evidence_classification.jsonl --output models/evidence-xlmr-cls --labels RESEARCH,TEACHING,KNOWLEDGE_TRANSFER,OTHER --label-field label_id
+python training/train_xlmr.py --data data/evidence_classification.jsonl --output models/evidence-xlmr-cls --labels PUBLICATION_1_1,PUBLICATION_1_4,PUBLICATION_1_5,PUBLICATION_2_2,TEACHING,OTHER --label-field reference_label_id
 python training/train_ner.py --data data/evidence_ner.jsonl --output models/evidence-xlmr-ner --labels O,B-TITLE,I-TITLE,B-AUTHOR,I-AUTHOR,B-DOI,I-DOI,B-YEAR,I-YEAR,B-SOURCE,I-SOURCE
 ```
 

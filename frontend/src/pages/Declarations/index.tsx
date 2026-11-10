@@ -258,6 +258,9 @@ export const Declarations = () => {
         fields.publicationYear = metadata.publication_year;
       }
       if (!current.doi && metadata.doi) fields.doi = metadata.doi;
+      if (!current.conversionRuleCode && metadata.suggested_rule_code) {
+        fields.conversionRuleCode = metadata.suggested_rule_code;
+      }
       if (!current.authors?.length && Array.isArray(metadata.authors) && metadata.authors.length) {
         fields.authors = metadata.authors.map((author: string, index: number) => ({
           authorName: author,
@@ -271,7 +274,10 @@ export const Declarations = () => {
         if (source) fields.sourceId = source.id;
       }
       form.setFieldsValue(fields);
-      toast.success('Đã tự động lấy thông tin từ liên kết bài báo');
+      const item = metadata.publication_item_code
+        ? ` Mục tham chiếu: ${metadata.publication_item_code}${metadata.publication_item_label ? ` - ${metadata.publication_item_label}` : ''}.`
+        : '';
+      toast.success(`Đã tự động lấy thông tin từ liên kết bài báo.${item}`);
     } catch {
       toast.error('Không thể lấy metadata từ liên kết này');
     }

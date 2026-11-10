@@ -91,6 +91,11 @@ export type DeclarationUrlMetadata = {
   content_type: string;
   document_type: string;
   activity_type: string;
+  reference_table?: string | null;
+  publication_item_code?: string | null;
+  publication_item_label?: string | null;
+  publication_category?: string | null;
+  classification_reason?: string | null;
   suggested_rule_code?: string | null;
   title?: string | null;
   authors?: string[];
