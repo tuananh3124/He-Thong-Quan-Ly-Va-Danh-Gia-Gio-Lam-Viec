@@ -116,6 +116,32 @@ def _xlmr_entities(text: str) -> list[tuple[str, str]]:
     model_path = get_settings().analyzer_ner_model_path
     if not model_path:
         return []
+    try:
+        from transformers import AutoModelForTokenClassification, AutoTokenizer
+        import torch
+
+        tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True)
+        model = AutoModelForTokenClassification.from_pretrained(model_path)
+        encoded = tokenizer(
+            text[:12000], return_tensors="pt", truncation=True,
+            max_length=512, return_offsets_mapping=True,
+        )
+        offsets = encoded.pop("offset_mapping")[0].tolist()
+        with torch.no_grad():
+            labels = torch.argmax(model(**encoded).logits, dim=-1)[0].tolist()
+        entities: list[tuple[str, str]] = []
+        for label_id, (start, end) in zip(labels, offsets):
+            if end <= start:
+                continue
+            label = str(model.config.id2label.get(label_id, "O"))
+            if label == "O":
+                continue
+            value = text[start:end].strip()
+            if value:
+                entities.append((label, value))
+        return entities
+    except Exception:
+        return []
 
 
 def _llm_predict(text: str) -> dict | None:
@@ -157,32 +183,6 @@ Nội dung minh chứng:
         return result if isinstance(result, dict) else None
     except Exception:
         return None
-    try:
-        from transformers import AutoModelForTokenClassification, AutoTokenizer
-        import torch
-
-        tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True)
-        model = AutoModelForTokenClassification.from_pretrained(model_path)
-        encoded = tokenizer(
-            text[:12000], return_tensors="pt", truncation=True,
-            max_length=512, return_offsets_mapping=True,
-        )
-        offsets = encoded.pop("offset_mapping")[0].tolist()
-        with torch.no_grad():
-            labels = torch.argmax(model(**encoded).logits, dim=-1)[0].tolist()
-        entities: list[tuple[str, str]] = []
-        for label_id, (start, end) in zip(labels, offsets):
-            if end <= start:
-                continue
-            label = str(model.config.id2label.get(label_id, "O"))
-            if label == "O":
-                continue
-            value = text[start:end].strip()
-            if value:
-                entities.append((label, value))
-        return entities
-    except Exception:
-        return []
 
 
 def analyze_pdf(data: bytes) -> EvidenceAnalyzeResponse:

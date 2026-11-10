@@ -333,7 +333,6 @@ export class DeclarationsService {
   async create(userId: string, dto: CreateDeclarationDto) {
     const enriched = await this.enrichFromUrl(dto);
     dto = enriched.dto;
-    if (!dto.name?.trim()) throw new BadRequestException('Name is required or must be discoverable from URL');
     await this.assertActivityAllowed(userId, dto.activityType);
     this.validateAuthorAllocations(dto.authors);
     const academicYearId = parseId(dto.academicYearId, 'academicYearId');
@@ -356,7 +355,7 @@ export class DeclarationsService {
         userId: parseId(userId, 'userId'),
         academicYearId,
         activityType: dto.activityType,
-        name: dto.name.trim(),
+        name: dto.name?.trim() || enriched.metadata?.title || 'Minh chứng chờ phân tích',
         conversionRuleCode: dto.conversionRuleCode?.trim() || null,
         quantity: dto.quantity ?? 1,
         publicationYear: dto.publicationYear,
@@ -396,7 +395,6 @@ export class DeclarationsService {
     this.assertOwner(declaration, userId, role);
     const enriched = await this.enrichFromUrl(dto);
     dto = enriched.dto;
-    if (!dto.name?.trim()) throw new BadRequestException('Name is required or must be discoverable from URL');
     await this.assertActivityAllowed(userId, dto.activityType);
     if (![DECLARATION_STATUS.DRAFT, DECLARATION_STATUS.REJECTED].includes(declaration.status as any)) {
       throw new BadRequestException('Only draft or rejected declarations can be edited');
@@ -418,7 +416,7 @@ export class DeclarationsService {
       where: { id },
       data: {
         activityType: dto.activityType,
-        name: dto.name.trim(),
+        name: dto.name?.trim() || enriched.metadata?.title || 'Minh chứng chờ phân tích',
         conversionRuleCode: dto.conversionRuleCode?.trim() || null,
         quantity: dto.quantity ?? 1,
         publicationYear: dto.publicationYear ?? null,
@@ -502,13 +500,41 @@ export class DeclarationsService {
 
     const aiResult = await this.analyzeEvidence(storagePath, originalName);
     if (aiResult) {
+      const aiAuthors = Array.isArray(aiResult.authors)
+        ? aiResult.authors.filter(
+            (author: unknown): author is string => typeof author === 'string' && Boolean(author.trim()),
+          )
+        : [];
+      const aiSourceId = !declaration.sourceId
+        ? await this.matchPublicationSource(aiResult.source_name)
+        : undefined;
+      const aiData: any = {
+        aiConfidence: typeof aiResult.confidence === 'number' ? aiResult.confidence : null,
+        aiRawResult: aiResult,
+        aiProcessedAt: new Date(),
+      };
+      if ((!declaration.name || declaration.name === 'Minh chứng chờ phân tích') && aiResult.title) {
+        aiData.name = aiResult.title;
+      }
+      if (!declaration.publicationYear && aiResult.publication_year) {
+        aiData.publicationYear = aiResult.publication_year;
+      }
+      if (!declaration.doi && aiResult.doi) aiData.doi = aiResult.doi;
+      if (!declaration.conversionRuleCode && aiResult.suggested_rule_code) {
+        aiData.conversionRuleCode = aiResult.suggested_rule_code;
+      }
+      if (aiSourceId) aiData.sourceId = aiSourceId;
+      if (!declaration.authors?.length && aiAuthors.length) {
+        aiData.authors = {
+          create: aiAuthors.map((author: string, index: number) => ({
+            authorName: author,
+            roleType: index === 0 ? 'MAIN_AUTHOR' : 'CO_AUTHOR',
+          })),
+        };
+      }
       await this.prisma.declarations.update({
         where: { id },
-        data: {
-          aiConfidence: typeof aiResult.confidence === 'number' ? aiResult.confidence : null,
-          aiRawResult: aiResult,
-          aiProcessedAt: new Date(),
-        },
+        data: aiData,
       });
     }
 
