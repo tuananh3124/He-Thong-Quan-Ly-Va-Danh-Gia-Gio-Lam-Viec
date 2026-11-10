@@ -35,3 +35,13 @@ def test_domestic_article_without_point_level_requires_review():
     )
     assert result["publication_item_code"] == "1.5"
     assert result["needs_review"] is True
+
+
+def test_journal_source_wins_over_book_keywords_from_publisher_page():
+    result = classify_publication_item(
+        "Springer article page contains related book chapter recommendations Scopus DOI article",
+        "Journal of Ethnobiology and Ethnomedicine",
+        "Indigenous water governance in a China-Vietnam borderland",
+    )
+    assert result["publication_item_code"] == "1.1"
+    assert result["suggested_rule_code"] == "RESEARCH_ARTICLE_ISI_SCOPUS"

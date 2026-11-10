@@ -125,6 +125,14 @@ def classify_publication_item(
     book = _has(normalized, "sach", "book", "monograph", "textbook", "giao trinh", "chuong sach")
     patent = _has(normalized, "patent", "sang che", "giai phap huu ich", "utility model")
 
+    # Publisher pages often contain unrelated links or taxonomy text mentioning
+    # "book"/"chapter". A structured journal source is stronger evidence than
+    # those page-wide keywords and must keep the document in the article branch.
+    journal_source = _has(source, "journal", "tap chi", "periodical")
+    if journal_source and article:
+        report = False
+        book = False
+
     if report:
         if indexed or _has(normalized, "bao tro", "international association", "association internationale"):
             code, confidence, reason = "2.1", 0.88, "Báo cáo có tín hiệu ISI/Scopus hoặc bảo trợ quốc tế uy tín."

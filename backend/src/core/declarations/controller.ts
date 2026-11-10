@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -69,6 +70,16 @@ export class DeclarationsController {
     @Body() dto: CreateDeclarationDto,
   ) {
     return this.declarationsService.update(id, userId, role, dto);
+  }
+
+  @Delete(':id')
+  @Roles(ROLE.Staff, ROLE.Admin)
+  remove(
+    @Param('id') id: string,
+    @Payload('userId') userId: IPayloadType['userId'],
+    @Payload('role') role: IPayloadType['role'],
+  ) {
+    return this.declarationsService.remove(id, userId, role);
   }
 
   @Post(':id/evidence')

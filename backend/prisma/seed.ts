@@ -29,20 +29,28 @@ async function main() {
   if (!user) {
     await prisma.users.create({
       data: {
-        name: 'Test User',
+        name: 'Lý Việt Trường',
         email: 'test@test.com',
         password: passwordTest,
         tenantId: tenant.id,
         role: ROLE.Staff,
-        staffCategory: 'LECTURER',
-        academicTitle: 'Giảng viên',
+        staffCategory: 'RESEARCHER',
+        academicTitle: 'Nghiên cứu viên',
         degree: 'TS',
       },
     });
-  } else if (!user.staffCategory) {
+  } else {
     await prisma.users.update({
       where: { id: user.id },
-      data: { staffCategory: 'LECTURER' },
+      data: {
+        name: 'Lý Việt Trường',
+        password: passwordTest,
+        tenantId: tenant.id,
+        role: ROLE.Staff,
+        staffCategory: 'RESEARCHER',
+        academicTitle: 'Nghiên cứu viên',
+        degree: 'TS',
+      },
     });
   }
 
@@ -53,11 +61,23 @@ async function main() {
   if (!managerUser) {
     await prisma.users.create({
       data: {
-        name: 'Test Manager',
+        name: 'Tài khoản Quản lý',
         email: 'manager@test.com',
         password: passwordTest,
         tenantId: tenant.id,
         role: ROLE.Manager,
+        managementRole: 'Quản lý đơn vị',
+      },
+    });
+  } else {
+    await prisma.users.update({
+      where: { id: managerUser.id },
+      data: {
+        name: 'Tài khoản Quản lý',
+        password: passwordTest,
+        tenantId: tenant.id,
+        role: ROLE.Manager,
+        staffCategory: null,
         managementRole: 'Quản lý đơn vị',
       },
     });

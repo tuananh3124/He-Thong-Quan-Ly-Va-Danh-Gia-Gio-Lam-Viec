@@ -208,6 +208,18 @@ export const useUpdateDeclaration = <
     ...params,
   });
 
+export const useDeleteDeclaration = <
+  T extends IHttpGenerics = { request: undefined; response: { id: string; deleted: boolean } },
+>(
+  id: string,
+  params?: IHttpType<T>,
+) =>
+  useHttp<T>({
+    url: `/declarations/${id}`,
+    method: 'delete',
+    ...params,
+  });
+
 export const useUploadDeclarationEvidence = <
   T extends IHttpGenerics = { request: FormData; response: Declaration },
 >(
