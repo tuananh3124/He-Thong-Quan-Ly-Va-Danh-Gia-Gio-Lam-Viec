@@ -1,6 +1,10 @@
 __pycache__/
 *.py[cod]
 .env
+data/raw/
+data/processed/
+models/
+outputs/
 .venv/
 venv/
 env/

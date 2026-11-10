@@ -23,6 +23,8 @@ def main() -> None:
     parser.add_argument("--output", required=True)
     parser.add_argument("--model", default="FacebookAI/xlm-roberta-base")
     parser.add_argument("--labels", required=True, help="Comma-separated BIO labels")
+    parser.add_argument("--max-length", type=int, default=512)
+    parser.add_argument("--max-steps", type=int, default=-1)
     args = parser.parse_args()
     labels = [item.strip() for item in args.labels.split(",") if item.strip()]
 
@@ -31,7 +33,7 @@ def main() -> None:
     tokenizer = AutoTokenizer.from_pretrained(args.model)
 
     def tokenize_and_align(batch):
-        encoded = tokenizer(batch["tokens"], is_split_into_words=True, truncation=True, max_length=512)
+        encoded = tokenizer(batch["tokens"], is_split_into_words=True, truncation=True, max_length=args.max_length)
         aligned = []
         for row, encoding in enumerate(encoded.encodings):
             word_ids = encoding.word_ids
@@ -71,11 +73,10 @@ def main() -> None:
             true_predictions.append(current_predictions)
         return {"f1": f1_score(true_labels, true_predictions)}
 
-    trainer = Trainer(
-        model=model,
-        args=TrainingArguments(
+    trainer_args = TrainingArguments(
             output_dir=args.output,
             num_train_epochs=4,
+            max_steps=args.max_steps,
             per_device_train_batch_size=8,
             per_device_eval_batch_size=8,
             eval_strategy="epoch",
@@ -83,13 +84,19 @@ def main() -> None:
             load_best_model_at_end=True,
             metric_for_best_model="f1",
             report_to="none",
-        ),
+        )
+    trainer_kwargs = dict(
+        model=model,
+        args=trainer_args,
         train_dataset=tokenized["train"],
         eval_dataset=tokenized["test"],
-        tokenizer=tokenizer,
         data_collator=DataCollatorForTokenClassification(tokenizer),
         compute_metrics=metrics,
     )
+    try:
+        trainer = Trainer(processing_class=tokenizer, **trainer_kwargs)
+    except TypeError:
+        trainer = Trainer(tokenizer=tokenizer, **trainer_kwargs)
     trainer.train()
     trainer.save_model(args.output)
     tokenizer.save_pretrained(args.output)

@@ -107,11 +107,48 @@ async function main() {
     },
   });
 
+  const domestic = await prisma.publication_classifications.upsert({
+    where: { name: 'TRONG NƯỚC' },
+    update: {},
+    create: {
+      name: 'TRONG NƯỚC',
+      description: 'Tạp chí và đặc san khoa học trong nước',
+    },
+  });
+
+  const internationalConference = await prisma.publication_classifications.upsert({
+    where: { name: 'HỘI THẢO QUỐC TẾ' },
+    update: {},
+    create: {
+      name: 'HỘI THẢO QUỐC TẾ',
+      description: 'Kỷ yếu hội thảo khoa học quốc tế',
+    },
+  });
+
   await prisma.publication_sources.upsert({
     where: { name_classificationId: { name: 'Sample Journal ISI', classificationId: isi.id } },
     update: {},
     create: { name: 'Sample Journal ISI', classificationId: isi.id },
   });
+
+  const catalogSources = [
+    { name: 'Journal of Ethnobiology and Ethnomedicine', classificationId: scopus.id },
+    { name: 'Tạp chí Khoa học Xã hội và Nhân văn', classificationId: domestic.id },
+    { name: 'Tạp chí Khoa học xã hội Việt Nam', classificationId: domestic.id },
+    { name: 'Tạp chí Nghiên cứu Văn hóa', classificationId: domestic.id },
+    { name: 'Đặc san Di sản văn hóa', classificationId: domestic.id },
+    {
+      name: 'Kỷ yếu hội thảo khoa học quốc tế Ngôn ngữ học và Việt Nam học trong kỷ nguyên mới',
+      classificationId: internationalConference.id,
+    },
+  ];
+  for (const source of catalogSources) {
+    await prisma.publication_sources.upsert({
+      where: { name_classificationId: { name: source.name, classificationId: source.classificationId } },
+      update: {},
+      create: source,
+    });
+  }
 
   await prisma.publication_sources.upsert({
     where: {

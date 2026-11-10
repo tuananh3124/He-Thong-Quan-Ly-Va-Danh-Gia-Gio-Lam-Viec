@@ -445,13 +445,12 @@ export const Declarations = () => {
                     <Form.Item
                       name="conversionRuleCode"
                       label="Quy tắc quy đổi"
-                      rules={[{ required: true, message: 'Chọn quy tắc quy đổi' }]}
                     >
                       <Select
                         showSearch
                         optionFilterProp="label"
                         loading={conversionRules.loading}
-                        placeholder="Chọn loại hoạt động cụ thể"
+                        placeholder="AI tự đề xuất từ URL hoặc PDF nếu để trống"
                         options={rules.map((rule: ConversionRule) => ({
                           value: rule.code ?? rule.id,
                           label: `${rule.label ?? rule.code ?? 'Quy tắc'}${rule.classification?.name ? ` (${rule.classification.name})` : ''} · ${rule.minHours != null || rule.maxHours != null ? `${rule.minHours ?? rule.hours}–${rule.maxHours ?? rule.hours}` : rule.hours} giờ${rule.unit ? `/${rule.unit}` : ''}`,
