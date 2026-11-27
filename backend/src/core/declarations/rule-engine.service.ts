@@ -37,6 +37,20 @@ export class DeclarationRuleEngineService {
     if (!declaration) throw new NotFoundException('Declaration not found');
 
     const now = new Date();
+    const sourceClassification = (declaration.source?.classification?.name ?? '').toLowerCase();
+    const isIndexedJournal =
+      sourceClassification.includes('scopus') ||
+      sourceClassification.includes('isi') ||
+      sourceClassification.includes('scie');
+    if (
+      declaration.activityType === 'RESEARCH' &&
+      isIndexedJournal &&
+      !declaration.conversionRuleCode
+    ) {
+      throw new BadRequestException(
+        'Chưa xác định Q1/Q2/Q3/Q4 cho bài báo WoS/Scopus; hãy cập nhật danh mục nguồn hoặc chọn luật quy đổi.',
+      );
+    }
     const rules = await this.prisma.conversion_rules.findMany({
       where: { activityType: declaration.activityType },
     });

@@ -234,6 +234,8 @@ def analyze_pdf(data: bytes) -> EvidenceAnalyzeResponse:
         activity = "RESEARCH"
         document_type = "PUBLICATION"
         rule = publication["suggested_rule_code"] or rule
+        if publication["publication_item_code"] == "1.1" and not publication.get("quartile"):
+            rule = None
         confidence = min(confidence, publication["confidence"])
     elif activity == "RESEARCH":
         # Do not emit a generic code that does not exist in Table 1.
@@ -248,6 +250,8 @@ def analyze_pdf(data: bytes) -> EvidenceAnalyzeResponse:
         publication_category=publication["publication_category"],
         classification_reason=publication["classification_reason"],
         suggested_rule_code=rule,
+        quartile=publication.get("quartile"),
+        quartile_source=publication.get("quartile_source"),
         title=title,
         authors=authors,
         doi=doi,

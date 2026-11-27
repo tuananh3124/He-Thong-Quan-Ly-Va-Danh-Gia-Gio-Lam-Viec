@@ -56,11 +56,19 @@ class EvidenceAnalyzeResponse(BaseModel):
     publication_category: str | None = None
     classification_reason: str | None = None
     suggested_rule_code: str | None = None
+    quartile: str | None = None
+    quartile_source: str | None = None
     title: str | None = None
     authors: list[str] = Field(default_factory=list)
     doi: str | None = None
     publication_year: int | None = None
     source_name: str | None = None
+    issn: str | None = None
+    quartile: str | None = None
+    quartile_source: str | None = None
+    quartile_year: int | None = None
+    quartile_provider: str | None = None
+    quartile_status: str | None = None
     classification: str | None = None
     confidence: float = Field(ge=0, le=1)
     needs_review: bool

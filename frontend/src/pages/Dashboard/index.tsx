@@ -55,13 +55,18 @@ export const Dashboard = () => {
   }, []);
 
   const items = declarations.data ?? [];
-  const totalHours = items.reduce((total, item) => total + (item.calculatedHours ?? 0), 0);
+  const approvedHours = items
+    .filter((item) => item.status === 'APPROVED')
+    .reduce((total, item) => total + (item.calculatedHours ?? 0), 0);
+  const pendingHours = items
+    .filter((item) => item.status === 'SUBMITTED')
+    .reduce((total, item) => total + (item.calculatedHours ?? 0), 0);
   const submittedCount = items.filter((item) => item.status === 'SUBMITTED').length;
   const approvedCount = items.filter((item) => item.status === 'APPROVED').length;
   const progress = items.length ? Math.round((approvedCount / items.length) * 100) : 0;
-  const remainingHours = Math.max(ANNUAL_TARGET_HOURS - totalHours, 0);
+  const remainingHours = Math.max(ANNUAL_TARGET_HOURS - approvedHours, 0);
   const hoursProgress = Math.min(
-    Math.round((totalHours / ANNUAL_TARGET_HOURS) * 100),
+    Math.round((approvedHours / ANNUAL_TARGET_HOURS) * 100),
     100,
   );
 
@@ -99,8 +104,8 @@ export const Dashboard = () => {
           <Col xs={24} sm={12} lg={6}>
             <Card className="stat-card">
               <Statistic
-                title="Giờ đã quy đổi"
-                value={totalHours}
+                title="Giờ đã duyệt"
+                value={approvedHours}
                 suffix="giờ"
                 prefix={<ClockCircleOutlined />}
               />
@@ -130,7 +135,7 @@ export const Dashboard = () => {
         <Card className="section-card" title="Tiến độ giờ làm việc" style={{ marginBottom: 16 }}>
           <Row gutter={[16, 16]}>
             <Col xs={24} md={8}>
-              <Statistic title="Đã có" value={totalHours} precision={2} suffix="giờ" />
+              <Statistic title="Đã duyệt" value={approvedHours} precision={2} suffix="giờ" />
             </Col>
             <Col xs={24} md={8}>
               <Statistic
@@ -151,12 +156,12 @@ export const Dashboard = () => {
           </Row>
           <Flex vertical gap="small" style={{ marginTop: 20 }}>
             <Flex justify="space-between">
-              <Typography.Text strong>Tiến độ hoàn thành</Typography.Text>
+              <Typography.Text strong>Tiến độ hoàn thành theo giờ đã duyệt</Typography.Text>
               <Typography.Text type="secondary">{hoursProgress}%</Typography.Text>
             </Flex>
             <Progress percent={hoursProgress} strokeColor="#1769aa" />
             <Typography.Text type="secondary">
-              Theo định mức tổng 1.760 giờ làm việc trong năm học.
+              Đang chờ duyệt: {pendingHours.toFixed(2)} giờ. Định mức tổng: {ANNUAL_TARGET_HOURS} giờ/năm học.
             </Typography.Text>
           </Flex>
         </Card>

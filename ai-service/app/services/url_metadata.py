@@ -12,7 +12,8 @@ from urllib.parse import urljoin, urlparse
 import httpx
 
 from app.services.analyzer import analyze_pdf
-from app.services.publication_reference import classify_publication_item
+from app.services.journal_ranking import extract_issn, lookup_quartile, resolve_issn_from_doi
+from app.services.publication_reference import QUARTILE_RULE_CODES, classify_publication_item
 
 
 class _MetadataParser(HTMLParser):
@@ -97,7 +98,7 @@ def _safe_public_url(value: str) -> str:
     return value.strip()
 
 
-def _extract_html(url: str, body: bytes) -> dict:
+async def _extract_html(url: str, body: bytes) -> dict:
     decoded = body.decode("utf-8", errors="replace")
     parser = _MetadataParser()
     parser.feed(decoded)
@@ -122,6 +123,10 @@ def _extract_html(url: str, body: bytes) -> dict:
 
     site_name = _first(meta, "og:site_name")
     source_name = _first(meta, "citation_journal_title", "dc.source")
+    issn = extract_issn(
+        _first(meta, "citation_issn", "prism.issn", "issn", "dc.identifier.issn"),
+        page_text,
+    )
     source_year = _years(_first(meta, "citation_publication_date", "article:published_time", "date"))
     publication_year = source_year or _years(schema.get("datePublished") if isinstance(schema.get("datePublished"), str) else None)
 
@@ -141,7 +146,17 @@ def _extract_html(url: str, body: bytes) -> dict:
     fields_found = sum(bool(value) for value in (title, authors, doi, publication_year, source_name))
     metadata_confidence = min(0.98, 0.45 + fields_found * 0.10)
     publication = classify_publication_item(page_text, source_name, title)
+    ranking = await lookup_quartile(issn or await resolve_issn_from_doi(doi), publication_year)
+    if ranking["quartile"] and publication["publication_category"] == "ARTICLE":
+        publication = classify_publication_item(
+            f"{page_text} Scopus {ranking['quartile']}",
+            source_name,
+            title,
+        )
     confidence = min(metadata_confidence, publication["confidence"])
+    verified_quartile = ranking["quartile"] or publication.get("quartile")
+    quartile_source = ranking["quartile_source"] or publication.get("quartile_source")
+    ranking_warning = ranking["quartile_reason"] if ranking["quartile_status"] != "verified" else None
     return {
         "source_url": url,
         "content_type": "text/html",
@@ -153,6 +168,12 @@ def _extract_html(url: str, body: bytes) -> dict:
         "publication_category": publication["publication_category"],
         "classification_reason": publication["classification_reason"],
         "suggested_rule_code": publication["suggested_rule_code"],
+        "issn": ranking["issn"] or issn,
+        "quartile": verified_quartile,
+        "quartile_source": quartile_source,
+        "quartile_year": ranking["quartile_year"],
+        "quartile_provider": ranking["quartile_source"],
+        "quartile_status": ranking["quartile_status"],
         "title": title,
         "authors": authors,
         "doi": doi,
@@ -160,10 +181,31 @@ def _extract_html(url: str, body: bytes) -> dict:
         "source_name": source_name,
         "classification": publication["publication_item_code"] or source_name,
         "confidence": round(confidence, 4),
-        "needs_review": confidence < 0.70 or publication["needs_review"],
+        "needs_review": confidence < 0.70 or publication["needs_review"] or (publication["publication_item_code"] == "1.1" and ranking["quartile_status"] != "verified"),
         "model": "url-metadata-v1",
-        "warnings": [] if fields_found >= 3 else ["Some metadata fields could not be verified from the page"],
+        "warnings": (["Some metadata fields could not be verified from the page"] if fields_found < 3 else [])
+        + ([ranking_warning] if ranking_warning else []),
     }
+
+
+async def _enrich_pdf_ranking(result: dict) -> dict:
+    issn = result.get("issn") or await resolve_issn_from_doi(result.get("doi"))
+    ranking = await lookup_quartile(issn, result.get("publication_year"))
+    result["issn"] = ranking["issn"] or issn
+    result["quartile_year"] = ranking["quartile_year"]
+    result["quartile_status"] = ranking["quartile_status"]
+    result["quartile_provider"] = ranking["quartile_source"]
+    if ranking["quartile"] and result.get("publication_item_code") == "1.1":
+        result["quartile"] = ranking["quartile"]
+        result["quartile_source"] = ranking["quartile_source"]
+        result["suggested_rule_code"] = QUARTILE_RULE_CODES[ranking["quartile"]]
+        result["needs_review"] = False
+    elif result.get("publication_item_code") == "1.1":
+        result["needs_review"] = True
+        warnings = result.setdefault("warnings", [])
+        if ranking["quartile_reason"]:
+            warnings.append(ranking["quartile_reason"])
+    return result
 
 
 async def fetch_url_metadata(url: str) -> dict:
@@ -183,8 +225,8 @@ async def fetch_url_metadata(url: str) -> dict:
                 raise ValueError("Remote document is larger than 8 MB")
             content_type = response.headers.get("content-type", "").lower()
             if "application/pdf" in content_type or current.lower().split("?", 1)[0].endswith(".pdf"):
-                result = analyze_pdf(response.content).model_dump()
+                result = await _enrich_pdf_ranking(analyze_pdf(response.content).model_dump())
                 result.update({"source_url": current, "content_type": "application/pdf", "model": f"{result['model']}+url"})
                 return result
-            return _extract_html(current, response.content)
+                return await _extract_html(current, response.content)
     raise ValueError("Too many redirects while fetching URL")

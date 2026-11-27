@@ -13,6 +13,7 @@ export type PublicationSource = {
   id: string;
   name: string;
   classificationId: string;
+  quartile?: 'Q1' | 'Q2' | 'Q3' | 'Q4' | null;
   classification?: { id: string; name: string };
 };
 
@@ -44,6 +45,10 @@ export type Declaration = {
     authors?: string[];
     doi?: string | null;
     publication_year?: number | null;
+    issn?: string | null;
+    quartile?: 'Q1' | 'Q2' | 'Q3' | 'Q4' | null;
+    quartile_source?: string | null;
+    quartile_status?: string | null;
     needs_review?: boolean;
     model?: string;
   } | null;
@@ -102,8 +107,14 @@ export type DeclarationUrlMetadata = {
   doi?: string | null;
   publication_year?: number | null;
   source_name?: string | null;
+  issn?: string | null;
   confidence: number;
   needs_review: boolean;
+  quartile?: 'Q1' | 'Q2' | 'Q3' | 'Q4' | null;
+  quartile_source?: string | null;
+  quartile_year?: number | null;
+  quartile_provider?: string | null;
+  quartile_status?: string | null;
   model: string;
   warnings?: string[];
 };
@@ -311,6 +322,37 @@ export const useManagerSummary = <
     ...params,
   });
 
+export type DuplicateCheckResponse = {
+  hasDuplicates: boolean;
+  matches: Array<{
+    id: string;
+    name: string;
+    doi?: string | null;
+    url?: string | null;
+    status: string;
+    calculatedHours?: number | null;
+    createdAt: string;
+  }>;
+};
+
+export const useDuplicateCheck = <
+  T extends IHttpGenerics = {
+    request: {
+      name?: string;
+      doi?: string;
+      url?: string;
+      academicYearId?: string;
+      excludeId?: string;
+    };
+    response: DuplicateCheckResponse;
+  },
+>(params?: IHttpType<T>) =>
+  useHttp<T>({
+    url: '/declarations/duplicate-check',
+    method: 'get',
+    ...params,
+  });
+
 export const usePublicationClassifications = <
   T extends IHttpGenerics = { request: undefined; response: PublicationClassification[] },
 >(params?: IHttpType<T>) =>
@@ -334,13 +376,25 @@ export const useCreatePublicationClassification = <
 
 export const useCreatePublicationSource = <
   T extends IHttpGenerics = {
-    request: { name: string; classificationId: string };
+    request: { name: string; classificationId: string; quartile?: string };
     response: PublicationSource;
   },
 >(params?: IHttpType<T>) =>
   useHttp<T>({
     url: '/publication-catalog/sources',
     method: 'post',
+    ...params,
+  });
+
+export const useUpdatePublicationSource = <
+  T extends IHttpGenerics = {
+    request: { quartile?: string | null };
+    response: PublicationSource;
+  },
+>(id: string, params?: IHttpType<T>) =>
+  useHttp<T>({
+    url: `/publication-catalog/sources/${id}`,
+    method: 'patch',
     ...params,
   });
 

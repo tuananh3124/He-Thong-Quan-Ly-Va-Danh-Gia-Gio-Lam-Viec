@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '@/common';
 import { CreatePublicationClassificationDto } from './dto/create-classification';
 import { CreatePublicationSourceDto } from './dto/create-source';
+import { UpdatePublicationSourceDto } from './dto/update-source';
 
 const parseId = (value: string, field: string) => {
   if (!/^\d+$/.test(value)) throw new BadRequestException(`${field} must be a numeric id`);
@@ -62,6 +63,24 @@ export class PublicationCatalogService {
         data: {
           name: dto.name,
           classificationId: parseId(dto.classificationId, 'classificationId'),
+          quartile: dto.quartile || null,
+        },
+        include: { classification: true },
+      }),
+    );
+  }
+
+  async updateSource(idValue: string, dto: UpdatePublicationSourceDto) {
+    const id = parseId(idValue, 'id');
+    return serialize(
+      await this.prisma.publication_sources.update({
+        where: { id },
+        data: {
+          name: dto.name,
+          classificationId: dto.classificationId
+            ? parseId(dto.classificationId, 'classificationId')
+            : undefined,
+          quartile: dto.quartile,
         },
         include: { classification: true },
       }),

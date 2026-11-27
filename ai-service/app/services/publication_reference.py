@@ -7,6 +7,13 @@ import unicodedata
 
 REFERENCE_TABLE = "TABLE_1_SCIENTIFIC_PUBLICATIONS"
 
+QUARTILE_RULE_CODES = {
+    "Q1": "RESEARCH_ARTICLE_WOS_SCOPUS_Q1",
+    "Q2": "RESEARCH_ARTICLE_WOS_SCOPUS_Q2",
+    "Q3": "RESEARCH_ARTICLE_WOS_SCOPUS_Q3",
+    "Q4": "RESEARCH_ARTICLE_WOS_SCOPUS_Q4",
+}
+
 PUBLICATION_ITEMS = {
     "1.1": {
         "label": "Bài báo tại tạp chí thuộc hệ thống ISI/Scopus",
@@ -19,16 +26,26 @@ PUBLICATION_ITEMS = {
         "rule_code": "RESEARCH_ARTICLE_FOREIGN_OTHER",
     },
     "1.3": {
+        "label": "Bài báo quốc tế khác có mã ISSN",
+        "category": "ARTICLE",
+        "rule_code": "RESEARCH_ARTICLE_INTERNATIONAL_ISSN",
+    },
+    "1.4": {
         "label": "Bài báo tại chuyên san tạp chí ĐHQGHN đạt chuẩn Scopus",
         "category": "ARTICLE",
         "rule_code": "RESEARCH_ARTICLE_VNU_SCOPUS_SECTION",
     },
-    "1.4": {
+    "1.5": {
         "label": "Bài báo trong nước được tính tối đa 0,5 điểm",
         "category": "ARTICLE",
         "rule_code": "RESEARCH_ARTICLE_DOMESTIC_05",
     },
-    "1.5": {
+    "1.6": {
+        "label": "Bài báo trong nước được tính tối đa 0,75 điểm",
+        "category": "ARTICLE",
+        "rule_code": "RESEARCH_ARTICLE_DOMESTIC_075",
+    },
+    "1.7": {
         "label": "Bài báo trong nước được tính tối đa 1 điểm",
         "category": "ARTICLE",
         "rule_code": "RESEARCH_ARTICLE_DOMESTIC_1",
@@ -91,6 +108,21 @@ def _has(text: str, *terms: str) -> bool:
     return any(term in text for term in terms)
 
 
+def extract_quartile(*values: str | None) -> str | None:
+    """Return an explicitly stated journal quartile, never infer it from Scopus alone."""
+    text = _normalize(" ".join(value for value in values if value))
+    patterns = (
+        r"\bquartile(?:\s+rank)?\s*[:\-]?\s*q?([1-4])\b",
+        r"\bq([1-4])\s+(?:quartile|journal|scopus|tạp chí|tap chi)\b",
+        r"\b(?:journal|tạp chí|tap chi)[^.!?\n]{0,100}\bq([1-4])\b",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return f"Q{match.group(1)}"
+    return None
+
+
 def item_from_code(code: str | None) -> dict | None:
     if not code or code not in PUBLICATION_ITEMS:
         return None
@@ -104,7 +136,8 @@ def classify_publication_item(
 ) -> dict:
     normalized = _normalize(" ".join(value for value in (text, source_name, title) if value))
     source = _normalize(source_name)
-    indexed = _has(normalized, "isi", "scopus", "web of science", "wos", "q1", "q2")
+    quartile = extract_quartile(text, source_name, title)
+    indexed = _has(normalized, "isi", "scopus", "web of science", "wos") or quartile is not None
     vnu = _has(normalized, "dhqghn", "dai hoc quoc gia ha noi", "vietnam national university", "vnu journal")
     report = _has(
         normalized,
@@ -168,15 +201,24 @@ def classify_publication_item(
         }
     elif article:
         if vnu and indexed:
-            code, confidence, reason = "1.3", 0.92, "Nguồn có tín hiệu chuyên san ĐHQGHN và Scopus."
+            code, confidence, reason = "1.4", 0.92, "Nguồn có tín hiệu chuyên san ĐHQGHN và Scopus."
         elif indexed:
-            code, confidence, reason = "1.1", 0.90, "Nguồn có tín hiệu ISI/Scopus."
+            code, confidence = "1.1", 0.94 if quartile else 0.72
+            if quartile:
+                reason = f"Nguồn có tín hiệu ISI/Scopus và hạng {quartile} được nêu rõ trong minh chứng."
+            else:
+                reason = "Nguồn có tín hiệu ISI/Scopus nhưng chưa có dữ kiện xác thực hạng Q1/Q2/Q3/Q4."
         elif international or not _has(normalized, "tap chi", "journal", "dac san", "viet nam", "vietnam"):
-            code, confidence, reason = "1.2", 0.66, "Bài báo có dấu hiệu công bố quốc tế ngoài ISI/Scopus."
+            if _has(normalized, "uy tin", "reputable", "prestigious"):
+                code, confidence, reason = "1.2", 0.76, "Bài báo quốc tế ngoài ISI/Scopus tại nguồn được mô tả là uy tín."
+            else:
+                code, confidence, reason = "1.3", 0.66, "Bài báo quốc tế có mã ISSN nhưng chưa xác định thuộc danh mục ISI/Scopus."
         elif _has(normalized, "0,5 diem", "0.5 diem", "nua diem"):
-            code, confidence, reason = "1.4", 0.88, "Nguồn trong nước có tín hiệu mức tối đa 0,5 điểm."
+            code, confidence, reason = "1.5", 0.88, "Nguồn trong nước có tín hiệu mức tối đa 0,5 điểm."
+        elif _has(normalized, "0,75 diem", "0.75 diem", "ba phan tu diem"):
+            code, confidence, reason = "1.6", 0.88, "Nguồn trong nước có tín hiệu mức tối đa 0,75 điểm."
         else:
-            code, confidence, reason = "1.5", 0.58, "Nguồn trong nước; chưa xác minh được mức điểm 0,5 hay 1,0 của Hội đồng chức danh giáo sư."
+            code, confidence, reason = "1.7", 0.58, "Nguồn trong nước; chưa xác minh được mức điểm 0,5, 0,75 hay 1,0 của Hội đồng chức danh giáo sư."
     else:
         return {
             "reference_table": REFERENCE_TABLE,
@@ -190,13 +232,21 @@ def classify_publication_item(
         }
 
     item = item_from_code(code) or {}
+    suggested_rule_code = item.get("rule_code")
+    if code == "1.1":
+        # Table 1 has four different hours for 1.1. A generic Scopus label is
+        # not enough to choose one of them, so leave the rule empty until the
+        # quartile is confirmed by the page or the administrator's catalog.
+        suggested_rule_code = QUARTILE_RULE_CODES.get(quartile) if quartile else None
     return {
         "reference_table": REFERENCE_TABLE,
         "publication_item_code": code,
         "publication_item_label": item.get("label"),
         "publication_category": item.get("category"),
-        "suggested_rule_code": item.get("rule_code"),
+        "suggested_rule_code": suggested_rule_code,
+        "quartile": quartile,
+        "quartile_source": "page" if quartile else None,
         "confidence": confidence,
-        "needs_review": confidence < 0.70,
+        "needs_review": confidence < 0.70 or (code == "1.1" and quartile is None),
         "classification_reason": reason,
     }

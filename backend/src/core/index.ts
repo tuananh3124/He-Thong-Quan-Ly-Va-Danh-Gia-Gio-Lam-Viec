@@ -4,3 +4,4 @@ export * from './academic-years/module';
 export * from './conversion-rules/module';
 export * from './publication-catalog/module';
 export * from './declarations/module';
+export * from './teaching-assignments/module';

@@ -35,10 +35,10 @@ export const Error: React.FC<ErrorResultProps> = ({ status, title, subTitle, ext
                   });
                 }}
               >
-                Back To Login
+                Quay lại đăng nhập
               </Button>
               <Button type="primary" onClick={() => window.location.reload()}>
-                Try Again
+                Thử lại
               </Button>
             </Space>
           )
@@ -57,8 +57,8 @@ export const ErrorPage = ({ status, errorMessage }: { status: number; errorMessa
       return (
         <Error
           status="403"
-          title="Authentication Required"
-          subTitle={errorMessage || 'Your session has expired. Please log in again.'}
+          title="Yêu cầu đăng nhập"
+          subTitle={errorMessage || 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'}
           extra={
             <Button
               type="primary"
@@ -71,7 +71,7 @@ export const ErrorPage = ({ status, errorMessage }: { status: number; errorMessa
                 });
               }}
             >
-              Log in to continue
+              Đăng nhập để tiếp tục
             </Button>
           }
         />
@@ -80,24 +80,24 @@ export const ErrorPage = ({ status, errorMessage }: { status: number; errorMessa
       return (
         <Error
           status="403"
-          title="Access Denied"
-          subTitle={errorMessage || "You don't have permission to access this page."}
+          title="Không có quyền truy cập"
+          subTitle={errorMessage || 'Bạn không có quyền truy cập trang này.'}
         />
       );
     case 404:
       return (
         <Error
           status="404"
-          title="Page Not Found"
-          subTitle={errorMessage || 'The page you are looking for does not exist.'}
+          title="Không tìm thấy trang"
+          subTitle={errorMessage || 'Trang bạn yêu cầu không tồn tại.'}
         />
       );
     default:
       return (
         <Error
           status="500"
-          title="Error"
-          subTitle={errorMessage || 'An unexpected error occurred. Please try again or contact us.'}
+          title="Đã xảy ra lỗi"
+          subTitle={errorMessage || 'Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.'}
         />
       );
   }

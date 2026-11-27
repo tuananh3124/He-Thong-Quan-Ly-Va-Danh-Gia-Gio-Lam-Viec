@@ -7,7 +7,20 @@ def test_scopus_article_maps_to_table_1_1():
         "Journal of Ethnobiology and Ethnomedicine",
     )
     assert result["publication_item_code"] == "1.1"
-    assert result["suggested_rule_code"] == "RESEARCH_ARTICLE_ISI_SCOPUS"
+    assert result["suggested_rule_code"] is None
+    assert result["needs_review"] is True
+
+
+def test_indexed_article_uses_explicit_quartile_rule():
+    result = classify_publication_item(
+        "Scopus Q2 journal article DOI",
+        "Sample Journal Scopus",
+    )
+    assert result["publication_item_code"] == "1.1"
+    assert result["quartile"] == "Q2"
+    assert result["quartile_source"] == "page"
+    assert result["suggested_rule_code"] == "RESEARCH_ARTICLE_WOS_SCOPUS_Q2"
+    assert result["needs_review"] is False
 
 
 def test_international_reviewed_report_maps_to_table_2_2():
@@ -33,7 +46,7 @@ def test_domestic_article_without_point_level_requires_review():
         "Bài báo DOI đăng tại tạp chí khoa học xã hội Việt Nam",
         "Tạp chí Khoa học xã hội Việt Nam",
     )
-    assert result["publication_item_code"] == "1.5"
+    assert result["publication_item_code"] == "1.7"
     assert result["needs_review"] is True
 
 
@@ -44,4 +57,4 @@ def test_journal_source_wins_over_book_keywords_from_publisher_page():
         "Indigenous water governance in a China-Vietnam borderland",
     )
     assert result["publication_item_code"] == "1.1"
-    assert result["suggested_rule_code"] == "RESEARCH_ARTICLE_ISI_SCOPUS"
+    assert result["suggested_rule_code"] is None
