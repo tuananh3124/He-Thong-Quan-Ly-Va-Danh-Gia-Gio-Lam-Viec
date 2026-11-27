@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import axios from 'axios';
 import { PrismaService } from '@/common';
+import { getEnv } from '@/utils';
 import { CreatePublicationClassificationDto } from './dto/create-classification';
 import { CreatePublicationSourceDto } from './dto/create-source';
 import { UpdatePublicationSourceDto } from './dto/update-source';
@@ -24,6 +26,23 @@ const serialize = (value: any) => ({
 @Injectable()
 export class PublicationCatalogService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async importRankingCsv(file?: Express.Multer.File) {
+    if (!file) throw new BadRequestException('Vui lòng chọn file xếp hạng .csv');
+    const serviceUrl = getEnv('AI_SERVICE_URL');
+    if (!serviceUrl) throw new BadRequestException('AI service chưa được cấu hình');
+    try {
+      const form = new FormData();
+      form.append('file', new Blob([new Uint8Array(file.buffer)], { type: 'text/csv' }), file.originalname);
+      const response = await axios.post(`${serviceUrl.replace(/\/$/, '')}/rankings/import`, form, {
+        timeout: 120_000,
+      });
+      return response.data;
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail || 'Không thể cập nhật dữ liệu xếp hạng từ CSV';
+      throw new BadRequestException(detail);
+    }
+  }
 
   async listClassifications() {
     const items = await this.prisma.publication_classifications.findMany({

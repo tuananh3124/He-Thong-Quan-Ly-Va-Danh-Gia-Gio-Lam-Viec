@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.config import get_settings
 from app.database import init_db
-from app.routers import analyze, analyze_url, documents, query, teaching_assignments
+from app.routers import analyze, analyze_url, documents, query, rankings, teaching_assignments
 from app.services.ratelimit import check_rate_limit
 from app.services.scimago_sync import download_latest_scimago
 
@@ -62,6 +62,7 @@ app.include_router(query.router)
 app.include_router(analyze.router)
 app.include_router(analyze_url.router)
 app.include_router(teaching_assignments.router)
+app.include_router(rankings.router)
 
 
 @app.middleware("http")

@@ -1,4 +1,7 @@
-from app.services.journal_ranking import _quartiles_from_scopus, extract_issn, normalize_issn
+from types import SimpleNamespace
+
+from app.services import journal_ranking
+from app.services.journal_ranking import extract_issn, normalize_issn
 
 
 def test_issn_is_normalized_from_page_metadata():
@@ -6,16 +9,17 @@ def test_issn_is_normalized_from_page_metadata():
     assert extract_issn("no issn", "eISSN: 2049-3630") == "2049-3630"
 
 
-def test_scopus_percentile_maps_to_quartile():
-    quartiles, year = _quartiles_from_scopus(
-        {"entry": [{"CiteScorePercentile": {"value": 82}, "year": 2025}]},
+def test_admin_scimago_snapshot_is_used_for_quartile(tmp_path, monkeypatch):
+    (tmp_path / "scimagojr_2025_vn.csv").write_text(
+        "Rank;Title;Issn;SJR Best Quartile\n1;Example Journal;1234567X;Q2\n",
+        encoding="utf-8",
     )
-    assert quartiles == {"Q1"}
-    assert year == 2025
-
-
-def test_multiple_subject_quartiles_are_not_silently_collapsed():
-    quartiles, _ = _quartiles_from_scopus(
-        {"entry": [{"quartile": ["Q1", "Q2"]}]},
+    monkeypatch.setattr(
+        journal_ranking,
+        "get_settings",
+        lambda: SimpleNamespace(scimago_data_dir=str(tmp_path)),
     )
-    assert quartiles == {"Q1", "Q2"}
+    result = journal_ranking.lookup_scimago_local("1234-567X", 2025)
+    assert result is not None
+    assert result["quartile"] == "Q2"
+    assert result["quartile_source"] == "scimago"

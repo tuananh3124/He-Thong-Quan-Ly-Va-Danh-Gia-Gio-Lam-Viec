@@ -48,9 +48,7 @@ class Settings(BaseSettings):
     max_analyze_pages: int = 30
 
     # --- Journal ranking / Quartile lookup ---
-    quartile_provider: str = "scopus"
-    scopus_api_key: str | None = None
-    scopus_api_url: str = "https://api.elsevier.com/content/serial/title"
+    # Quartile is resolved only from the administrator-managed SCImago CSV snapshots.
     quartile_lookup_timeout: float = 12.0
     scimago_fallback_enabled: bool = True
     scimago_data_dir: str = "data/rankings/scimago"

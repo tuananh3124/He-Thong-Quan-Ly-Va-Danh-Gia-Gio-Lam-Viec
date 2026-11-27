@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import axios from 'axios';
 import {
   Button,
   Card,
@@ -11,10 +12,13 @@ import {
   Tabs,
   Tag,
   Typography,
+  Upload,
+  type UploadFile,
 } from 'antd';
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
 import { ACTIVITY_TYPE } from '@projectname/shared';
 import { Page } from '@/components/ui';
+import { useGlobal, useMessage } from '@/hooks';
 import {
   useAcademicYears,
   useConversionRules,
@@ -90,11 +94,15 @@ const SourceQuartileEditor = ({ source, onUpdated }: { source: PublicationSource
 };
 
 export const Configuration = ({ defaultTab = 'years' }: { defaultTab?: 'years' | 'catalog' | 'rules' }) => {
+  const { apiBaseUrl, token } = useGlobal();
+  const toast = useMessage();
   const [yearForm] = Form.useForm<AcademicYearValues>();
   const [classificationForm] = Form.useForm<ClassificationValues>();
   const [sourceForm] = Form.useForm<SourceValues>();
   const [ruleForm] = Form.useForm<RuleValues>();
   const [selectedRuleYear, setSelectedRuleYear] = useState<string | undefined>();
+  const [rankingFileList, setRankingFileList] = useState<UploadFile[]>([]);
+  const [rankingUploading, setRankingUploading] = useState(false);
 
   const years = useAcademicYears<{
     request: { activeOnly?: boolean };
@@ -114,6 +122,29 @@ export const Configuration = ({ defaultTab = 'years' }: { defaultTab?: 'years' |
     years.fetchData();
     classifications.fetchData();
     rules.fetchData();
+  };
+
+  const importRankingCsv = async (file: File) => {
+    setRankingUploading(true);
+    const body = new FormData();
+    body.append('file', file);
+    try {
+      const response = await axios.post(`${apiBaseUrl}/publication-catalog/rankings/import`, body, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 120_000,
+      });
+      const result = response.data?.data ?? response.data;
+      toast.success(`Đã cập nhật dữ liệu xếp hạng năm ${result?.year ?? ''}`.trim());
+      setRankingFileList([]);
+      refresh();
+    } catch (error) {
+      const detail = axios.isAxiosError(error)
+        ? error.response?.data?.message || error.response?.data?.detail
+        : undefined;
+      toast.error(detail || 'Không thể cập nhật file xếp hạng CSV');
+    } finally {
+      setRankingUploading(false);
+    }
   };
 
   const createYear = useCreateAcademicYear({
@@ -217,6 +248,30 @@ export const Configuration = ({ defaultTab = 'years' }: { defaultTab?: 'years' |
             label: 'Nguồn công bố',
             children: (
               <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                <Card title="Cập nhật xếp hạng tạp chí bằng CSV">
+                  <Typography.Paragraph type="secondary">
+                    Tải file CSV SCImago mới nhất lên khi dữ liệu xếp hạng thay đổi. Hệ thống sẽ lưu snapshot theo năm
+                    và dùng ISSN để xác định Q1, Q2, Q3 hoặc Q4 khi xử lý bài báo.
+                  </Typography.Paragraph>
+                  <Upload
+                    accept=".csv,text/csv"
+                    maxCount={1}
+                    fileList={rankingFileList}
+                    beforeUpload={(file) => {
+                      void importRankingCsv(file);
+                      return false;
+                    }}
+                    onChange={({ fileList }) => setRankingFileList(fileList.slice(-1))}
+                    onRemove={() => {
+                      setRankingFileList([]);
+                      return true;
+                    }}
+                  >
+                    <Button icon={<UploadOutlined />} loading={rankingUploading}>
+                      Chọn file CSV xếp hạng
+                    </Button>
+                  </Upload>
+                </Card>
                 <Card title="Thêm phân loại">
                   <Form
                     form={classificationForm}

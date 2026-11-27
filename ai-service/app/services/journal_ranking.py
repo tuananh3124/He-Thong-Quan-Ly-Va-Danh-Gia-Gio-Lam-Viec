@@ -1,4 +1,4 @@
-"""Resolve journal ISSN and Quartile from an external ranking provider.
+"""Resolve journal ISSN and Quartile from administrator-managed CSV snapshots.
 
 The DOI/article page identifies the journal, but it does not reliably contain
 its Q1-Q4 ranking. This module keeps that concern separate from document
@@ -7,6 +7,7 @@ classification and makes the provider response auditable.
 from __future__ import annotations
 
 import csv
+import io
 import re
 from pathlib import Path
 from typing import Any
@@ -69,7 +70,8 @@ def lookup_scimago_local(issn: str | None, publication_year: int | None = None) 
     for snapshot_year, path in preferred:
         try:
             with path.open("r", encoding="utf-8-sig", newline="") as handle:
-                reader = csv.DictReader(handle, delimiter=";")
+                content = handle.read()
+                reader = csv.DictReader(io.StringIO(content), delimiter=";" if content.splitlines()[0].count(";") >= content.splitlines()[0].count(",") else ",")
                 for row in reader:
                     if target not in _issns(row.get("Issn")):
                         continue
@@ -118,44 +120,6 @@ def _walk_values(value: Any, wanted: set[str]) -> list[Any]:
     return found
 
 
-def _quartiles_from_scopus(payload: dict[str, Any]) -> tuple[set[str], int | None]:
-    explicit: set[str] = set()
-    for value in _walk_values(payload, {"quartile", "quartiles"}):
-        for match in re.findall(r"\bQ([1-4])\b", str(value), re.IGNORECASE):
-            explicit.add(f"Q{match}")
-
-    # Some Scopus metrics responses expose CiteScore percentile rather than a
-    # ready-made Q label. The standard four bands are used as a transparent
-    # fallback: 75-100 Q1, 50-74 Q2, 25-49 Q3, 0-24 Q4.
-    percentiles: list[float] = []
-    for value in _walk_values(
-        payload,
-        {"citescorepercentile", "citescorepercentiles", "percentile", "percentiles"},
-    ):
-        values = value if isinstance(value, list) else [value]
-        for item in values:
-            if isinstance(item, dict):
-                item = item.get("value") or item.get("percentile") or item.get("percent")
-            try:
-                number = float(str(item).replace("%", "").strip())
-            except (TypeError, ValueError):
-                continue
-            if 0 <= number <= 100:
-                percentiles.append(number)
-    for percentile in percentiles:
-        explicit.add("Q1" if percentile >= 75 else "Q2" if percentile >= 50 else "Q3" if percentile >= 25 else "Q4")
-
-    years: list[int] = []
-    for value in _walk_values(payload, {"year", "publicationyear", "citescoreyear"}):
-        try:
-            year = int(value)
-        except (TypeError, ValueError):
-            continue
-        if 1990 <= year <= 2100:
-            years.append(year)
-    return explicit, max(years) if years else None
-
-
 async def lookup_quartile(issn: str | None, publication_year: int | None = None) -> dict[str, Any]:
     normalized_issn = normalize_issn(issn)
     result: dict[str, Any] = {
@@ -171,55 +135,10 @@ async def lookup_quartile(issn: str | None, publication_year: int | None = None)
     if not normalized_issn:
         result.update({"quartile_status": "missing_issn", "quartile_reason": "Không tìm thấy ISSN của tạp chí."})
         return result
-    if settings.quartile_provider.lower() != "scopus":
-        if local_fallback:
-            return local_fallback
-        result.update({"quartile_status": "unsupported_provider", "quartile_reason": "Nguồn Quartile chưa được hỗ trợ."})
-        return result
-    if not settings.scopus_api_key:
-        if local_fallback:
-            return local_fallback
-        result.update({"quartile_status": "missing_api_key", "quartile_reason": "Chưa cấu hình SCOPUS_API_KEY."})
-        return result
-
-    try:
-        async with httpx.AsyncClient(timeout=settings.quartile_lookup_timeout) as client:
-            response = await client.get(
-                settings.scopus_api_url,
-                params={"issn": normalized_issn, "view": "ENHANCED"},
-                headers={
-                    "X-ELS-APIKey": settings.scopus_api_key,
-                    "Accept": "application/json",
-                },
-            )
-            response.raise_for_status()
-            payload = response.json()
-        quartiles, metric_year = _quartiles_from_scopus(payload)
-        if len(quartiles) == 1:
-            result.update({
-                "quartile": next(iter(quartiles)),
-                "quartile_source": "scopus",
-                "quartile_year": metric_year or publication_year,
-                "quartile_status": "verified",
-            })
-        elif len(quartiles) > 1:
-            result.update({
-                "quartile_status": "ambiguous",
-                "quartile_reason": "Scopus trả nhiều Quartile theo các lĩnh vực; cần chính sách chọn lĩnh vực.",
-            })
-        else:
-            if local_fallback:
-                return local_fallback
-            result.update({"quartile_status": "not_found", "quartile_reason": "Scopus không trả Quartile/percentile cho ISSN này."})
-    except httpx.HTTPStatusError as exc:
-        if local_fallback:
-            return local_fallback
-        result.update({
-            "quartile_status": "provider_error",
-            "quartile_reason": f"Scopus trả mã HTTP {exc.response.status_code}.",
-        })
-    except (httpx.HTTPError, ValueError) as exc:
-        if local_fallback:
-            return local_fallback
-        result.update({"quartile_status": "provider_error", "quartile_reason": str(exc)})
+    if local_fallback:
+        return local_fallback
+    result.update({
+        "quartile_status": "not_found",
+        "quartile_reason": "Chưa có snapshot SCImago phù hợp với ISSN này.",
+    })
     return result
