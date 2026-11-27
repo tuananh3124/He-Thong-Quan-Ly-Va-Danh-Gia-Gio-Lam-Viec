@@ -24,6 +24,7 @@ const roleLabel: Record<ROLE_TYPE, string> = {
 const categoryLabel: Record<STAFF_CATEGORY_TYPE, string> = {
   [STAFF_CATEGORY.Lecturer]: 'Giảng viên',
   [STAFF_CATEGORY.Researcher]: 'Nghiên cứu viên',
+  [STAFF_CATEGORY.LecturerResearcher]: 'Giảng viên & nghiên cứu viên',
 };
 
 const roleOptions = Object.values(ROLE).map((value) => ({
@@ -241,7 +242,7 @@ export const Users = () => {
                 <Form.Item
                   name="staffCategory"
                   label="Nhóm cán bộ"
-                  rules={[{ required: true, message: 'Chọn giảng viên hoặc nghiên cứu viên' }]}
+                  rules={[{ required: true, message: 'Chọn nhóm cán bộ' }]}
                 >
                   <Select options={categoryOptions} />
                 </Form.Item>

@@ -165,7 +165,9 @@ export class TeachingAssignmentsService {
     return this.prisma.users.findMany({
       where: {
         role: ROLE.Staff,
-        staffCategory: { in: [STAFF_CATEGORY.Lecturer, STAFF_CATEGORY.Researcher] },
+        staffCategory: {
+          in: [STAFF_CATEGORY.Lecturer, STAFF_CATEGORY.Researcher, STAFF_CATEGORY.LecturerResearcher],
+        },
         tenantId,
       },
       select: { id: true, name: true, email: true, staffCategory: true, tenantId: true },
@@ -244,6 +246,7 @@ export class TeachingAssignmentsService {
     let importedCount = 0;
     let skippedCount = 0;
     let unmatchedCount = 0;
+    const existingTeachingNames = new Map<string, Array<{ name: string; calculatedHours: number | null }>>();
 
     try {
       for (const [index, assignment] of assignments.entries()) {
@@ -299,16 +302,21 @@ export class TeachingAssignmentsService {
         quantity = Math.max(0.01, quantity);
         baseRow.quantity = Number(quantity.toFixed(2));
         const name = `${baseRow.courseName}${baseRow.className ? ` - ${baseRow.className}` : ''}`;
-        const duplicate = await this.prisma.declarations.findFirst({
-          where: {
-            userId: fuzzy.id,
-            academicYearId: academicYear.id,
-            activityType: ACTIVITY_TYPE.TEACHING,
-            name,
-            status: { not: DECLARATION_STATUS.REJECTED },
-          },
-          orderBy: { createdAt: 'desc' },
-        });
+        const userKey = fuzzy.id.toString();
+        let existing = existingTeachingNames.get(userKey);
+        if (!existing) {
+          existing = await this.prisma.declarations.findMany({
+            where: {
+              userId: fuzzy.id,
+              academicYearId: academicYear.id,
+              activityType: ACTIVITY_TYPE.TEACHING,
+              status: { not: DECLARATION_STATUS.REJECTED },
+            },
+            select: { name: true, calculatedHours: true },
+          });
+          existingTeachingNames.set(userKey, existing);
+        }
+        const duplicate = existing.find((item) => normalize(item.name) === normalize(name));
         if (duplicate) {
           skippedCount += 1;
           baseRow.status = 'SKIPPED';
@@ -352,6 +360,7 @@ export class TeachingAssignmentsService {
           baseRow.status = 'IMPORTED';
           baseRow.calculatedHours = calculated.calculatedHours;
           baseRow.message = 'Đã tạo và duyệt kết quả cho giảng viên';
+          existing.push({ name, calculatedHours: calculated.calculatedHours });
         } catch (error: any) {
           await this.prisma.declarations.delete({ where: { id: declaration.id } });
           baseRow.status = 'FAILED';

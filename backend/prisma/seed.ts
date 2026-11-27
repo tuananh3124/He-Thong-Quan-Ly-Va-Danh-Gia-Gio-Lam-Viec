@@ -57,8 +57,8 @@ async function main() {
         password: passwordTest,
         tenantId: tenant.id,
         role: ROLE.Staff,
-        staffCategory: 'RESEARCHER',
-        academicTitle: 'Nghiên cứu viên',
+        staffCategory: 'LECTURER_RESEARCHER',
+        academicTitle: 'Giảng viên kiêm nghiên cứu viên',
         degree: 'TS',
       },
     });
@@ -70,8 +70,8 @@ async function main() {
         password: passwordTest,
         tenantId: tenant.id,
         role: ROLE.Staff,
-        staffCategory: 'RESEARCHER',
-        academicTitle: 'Nghiên cứu viên',
+        staffCategory: 'LECTURER_RESEARCHER',
+        academicTitle: 'Giảng viên kiêm nghiên cứu viên',
         degree: 'TS',
       },
     });

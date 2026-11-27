@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { Dashboard, Declarations, HelpCenter, Login, ManagerDashboard, ManagerTeachingAssignments, Settings as SettingPage } from '@/pages';
 import type { IRouteType } from '@/types';
-import { BarChart3, ClipboardCheck, ClipboardList, HelpCircle, LayoutDashboard, Settings } from 'lucide-react';
+import { ClipboardCheck, ClipboardList, HelpCircle, LayoutDashboard, Settings } from 'lucide-react';
 import { ROLE } from '@projectname/shared';
 
 const NotFound = () => {
@@ -71,10 +71,6 @@ export const routes: IRouteType[] = [
     element: <ManagerDashboard />,
     handle: {
       role: [ROLE.Manager],
-      menu: {
-        label: 'Thống kê đơn vị',
-        icon: <BarChart3 size={18} />,
-      },
     },
   },
   {

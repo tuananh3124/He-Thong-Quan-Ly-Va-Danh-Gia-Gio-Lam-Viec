@@ -49,18 +49,22 @@ export const Settings: React.FC = () => {
                 ? 'Quản trị viên'
                 : user?.role === ROLE.Manager
                   ? 'Quản lý'
-                  : user?.staffCategory === STAFF_CATEGORY.Researcher
-                    ? 'Nghiên cứu viên'
-                    : user?.staffCategory === STAFF_CATEGORY.Lecturer
-                      ? 'Giảng viên'
+                  : user?.staffCategory === STAFF_CATEGORY.LecturerResearcher
+                    ? 'Giảng viên & nghiên cứu viên'
+                    : user?.staffCategory === STAFF_CATEGORY.Researcher
+                      ? 'Nghiên cứu viên'
+                      : user?.staffCategory === STAFF_CATEGORY.Lecturer
+                        ? 'Giảng viên'
                       : 'Cán bộ'}
             </Tag>
           </Descriptions.Item>
           <Descriptions.Item label="Nhóm cán bộ">
-            {user?.staffCategory === STAFF_CATEGORY.Researcher
-              ? 'Nghiên cứu viên'
-              : user?.staffCategory === STAFF_CATEGORY.Lecturer
-                ? 'Giảng viên'
+            {user?.staffCategory === STAFF_CATEGORY.LecturerResearcher
+              ? 'Giảng viên & nghiên cứu viên'
+              : user?.staffCategory === STAFF_CATEGORY.Researcher
+                ? 'Nghiên cứu viên'
+                : user?.staffCategory === STAFF_CATEGORY.Lecturer
+                  ? 'Giảng viên'
                 : 'Chưa cập nhật'}
           </Descriptions.Item>
           <Descriptions.Item label="Chức danh">

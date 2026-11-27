@@ -68,6 +68,27 @@ const statusLabel: Record<string, string> = {
   REJECTED: 'Từ chối',
 };
 
+const formatHours = (value: number | null | undefined) =>
+  value == null ? 'Chưa tính' : Number(value.toFixed(2)).toString();
+
+const normalizePersonName = (value?: string | null) =>
+  (value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\b(?:gs|pgs|ts|ths|dr|prof)\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const personNameMatches = (accountName?: string | null, authorName?: string | null) => {
+  const account = normalizePersonName(accountName);
+  const author = normalizePersonName(authorName);
+  if (!account || !author) return false;
+  if (account === author || author.includes(account)) return true;
+  return account.split(' ').sort().join(' ') === author.split(' ').sort().join(' ');
+};
+
 export const Declarations = () => {
   const { role, apiBaseUrl, token, user } = useGlobal();
   const toast = useMessage();
@@ -77,25 +98,33 @@ export const Declarations = () => {
   const [editingEvidenceName, setEditingEvidenceName] = useState<string | null>(null);
   const [evidenceFileList, setEvidenceFileList] = useState<UploadFile[]>([]);
   const [evidenceUploading, setEvidenceUploading] = useState(false);
+  const [evidenceAnalyzing, setEvidenceAnalyzing] = useState(false);
   const [reviewing, setReviewing] = useState<Declaration | null>(null);
   const [rejecting, setRejecting] = useState(false);
   const [action, setAction] = useState<{ id: string; type: 'calculate' | 'submit' } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [managerStatus, setManagerStatus] = useState<'ALL' | 'SUBMITTED' | 'APPROVED' | 'REJECTED'>('SUBMITTED');
+  const [selectedYearId, setSelectedYearId] = useState<string>();
   const [form] = Form.useForm<CreateDeclarationRequest>();
   const [reviewForm] = Form.useForm<ReviewDeclarationRequest>();
   const declarations = useDeclarations({
-    params: isManager ? { status: managerStatus === 'ALL' ? undefined : managerStatus } : undefined,
+    params: {
+      ...(isManager ? { status: managerStatus === 'ALL' ? undefined : managerStatus } : {}),
+      academicYearId: selectedYearId,
+    },
   });
-  const academicYears = useAcademicYears();
+  const academicYears = useAcademicYears({ params: { activeOnly: false } });
   const sources = usePublicationSources();
-  const conversionRules = useConversionRules();
+  const conversionRules = useConversionRules({
+    params: selectedYearId ? { academicYearId: selectedYearId } : undefined,
+  });
   const watchedActivityType = Form.useWatch('activityType', form);
   const watchedSourceId = Form.useWatch('sourceId', form);
   const watchedUrl = Form.useWatch('url', form);
   const selectedSource = (sources.data ?? []).find((item) => item.id === watchedSourceId);
-  const activeAcademicYear =
-    academicYears.data?.find((year) => year.isActive) ?? academicYears.data?.[0];
+  const selectedAcademicYear = academicYears.data?.find((year) => year.id === selectedYearId)
+    ?? academicYears.data?.find((year) => year.isActive)
+    ?? academicYears.data?.[0];
   const availableConversionRules = (conversionRules.data ?? []).filter(
     (rule) =>
       rule.activityType === watchedActivityType &&
@@ -106,7 +135,7 @@ export const Declarations = () => {
     (Boolean(watchedUrl?.trim()) || evidenceFileList.length > 0);
   const visibleActivityOptions = user?.staffCategory === STAFF_CATEGORY.Researcher
     ? activityOptions.filter((item) => item.value === ACTIVITY_TYPE.RESEARCH)
-    : user?.staffCategory === STAFF_CATEGORY.Lecturer
+    : [STAFF_CATEGORY.Lecturer, STAFF_CATEGORY.LecturerResearcher].includes(user?.staffCategory as any)
       ? activityOptions.filter((item) => [ACTIVITY_TYPE.RESEARCH, ACTIVITY_TYPE.TEACHING].includes(item.value as any))
       : activityOptions;
 
@@ -169,8 +198,8 @@ export const Declarations = () => {
 
   const loadData = () => {
     declarations.fetchData();
+    academicYears.fetchData();
     if (!isManager) {
-      academicYears.fetchData();
       sources.fetchData();
       conversionRules.fetchData();
     }
@@ -178,7 +207,14 @@ export const Declarations = () => {
 
   useEffect(() => {
     loadData();
-  }, [isManager, managerStatus]);
+  }, [isManager, managerStatus, selectedYearId]);
+
+  useEffect(() => {
+    if (!selectedYearId && academicYears.data?.length) {
+      const activeYear = academicYears.data.find((year) => year.isActive) ?? academicYears.data[0];
+      setSelectedYearId(activeYear.id);
+    }
+  }, [academicYears.data, selectedYearId]);
 
   useEffect(() => {
     const refreshVisibleData = () => {
@@ -193,12 +229,12 @@ export const Declarations = () => {
       window.removeEventListener('focus', refreshVisibleData);
       document.removeEventListener('visibilitychange', refreshVisibleData);
     };
-  }, [isManager, managerStatus]);
+  }, [isManager, managerStatus, selectedYearId]);
 
   useEffect(() => {
-    if (isManager || editingId || !activeAcademicYear) return;
-    form.setFieldsValue({ academicYearId: activeAcademicYear.id });
-  }, [activeAcademicYear?.id, editingId, isManager]);
+    if (isManager || editingId || !selectedAcademicYear) return;
+    form.setFieldsValue({ academicYearId: selectedAcademicYear.id });
+  }, [selectedAcademicYear?.id, editingId, isManager]);
 
   useEffect(() => {
     if (!action) return;
@@ -232,6 +268,13 @@ export const Declarations = () => {
   };
 
   const handleSave = async (values: CreateDeclarationRequest) => {
+    if (
+      values.activityType === ACTIVITY_TYPE.RESEARCH &&
+      !values.authors?.some((author) => personNameMatches(user?.name, author.authorName))
+    ) {
+      toast.error('Tên tác giả phải trùng với tên tài khoản của người kê khai');
+      return;
+    }
     try {
       const response = await axios.get(`${apiBaseUrl}/declarations/duplicate-check`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -292,8 +335,87 @@ export const Declarations = () => {
     setOpen(true);
   };
 
-  const handleEvidenceChange: UploadProps['onChange'] = ({ fileList }) => {
+  const applyEvidenceMetadata = (metadata: any) => {
+    const current = form.getFieldsValue();
+    const fields: Partial<CreateDeclarationRequest> = {};
+    if (!current.activityType && metadata.activity_type) {
+      fields.activityType = metadata.activity_type as CreateDeclarationRequest['activityType'];
+    }
+    if (!current.name && metadata.title) fields.name = metadata.title;
+    if (!current.publicationYear && metadata.publication_year) {
+      fields.publicationYear = metadata.publication_year;
+    }
+    if (!current.doi && metadata.doi) fields.doi = metadata.doi;
+    if (!current.conversionRuleCode && metadata.suggested_rule_code) {
+      fields.conversionRuleCode = metadata.suggested_rule_code;
+    }
+    if (metadata.activity_type === ACTIVITY_TYPE.RESEARCH || metadata.publication_item_code) {
+      fields.quantity = 1;
+    }
+    if (!current.authors?.length && Array.isArray(metadata.authors) && metadata.authors.length) {
+      fields.authors = metadata.authors.map((author: string, index: number) => ({
+        authorName: author,
+        roleType: index === 0 ? 'MAIN_AUTHOR' : 'CO_AUTHOR',
+      }));
+    }
+    if (!current.sourceId && metadata.source_name) {
+      const normalizedSource = String(metadata.source_name).toLowerCase();
+      const source = (sources.data ?? []).find((item) => {
+        const candidate = item.name.toLowerCase();
+        return candidate === normalizedSource || candidate.includes(normalizedSource) || normalizedSource.includes(candidate);
+      });
+      if (source) {
+        fields.sourceId = source.id;
+        if (!current.conversionRuleCode && !metadata.suggested_rule_code && source.quartile) {
+          fields.conversionRuleCode = `RESEARCH_ARTICLE_WOS_SCOPUS_${source.quartile}`;
+        }
+      }
+    }
+    form.setFieldsValue(fields);
+    return fields;
+  };
+
+  const handleEvidenceChange: UploadProps['onChange'] = async ({ fileList }) => {
     setEvidenceFileList(fileList.slice(-1));
+    const file = fileList[fileList.length - 1]?.originFileObj;
+    if (!file) return;
+
+    setEvidenceAnalyzing(true);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const response = await axios.post(`${apiBaseUrl}/declarations/analyze-evidence`, body, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 120_000,
+      });
+      let metadata = response.data?.data ?? response.data;
+      if (metadata?.doi) {
+        try {
+          const doiResponse = await axios.post(
+            `${apiBaseUrl}/declarations/metadata-from-url`,
+            { url: `https://doi.org/${metadata.doi}` },
+            { headers: { Authorization: `Bearer ${token}` }, timeout: 30_000 },
+          );
+          metadata = { ...metadata, ...(doiResponse.data?.data ?? doiResponse.data) };
+        } catch {
+          // Keep the fields extracted directly from the PDF when DOI metadata is unavailable.
+        }
+      }
+      const fields = applyEvidenceMetadata(metadata);
+      const filledCount = Object.keys(fields).filter((key) => key !== 'quantity').length;
+      if (filledCount) {
+        toast.success(`Đã tự điền ${filledCount} trường từ PDF`);
+      } else {
+        toast.warning('Đã đọc PDF nhưng chưa tìm thấy thông tin có thể tự điền');
+      }
+    } catch (error) {
+      const detail = axios.isAxiosError(error)
+        ? error.response?.data?.message || error.response?.data?.detail
+        : undefined;
+      toast.error(detail ? `Không thể phân tích PDF: ${detail}` : 'Không thể phân tích PDF minh chứng');
+    } finally {
+      setEvidenceAnalyzing(false);
+    }
   };
 
   const downloadEvidence = async (record: Declaration) => {
@@ -336,12 +458,12 @@ export const Declarations = () => {
     form.resetFields();
     form.setFieldsValue({
       quantity: 1,
-      academicYearId: activeAcademicYear?.id,
+      academicYearId: selectedAcademicYear?.id,
     });
     setOpen(true);
   };
 
-  const saving = createDeclaration.loading || updateDeclaration.loading || evidenceUploading;
+  const saving = createDeclaration.loading || updateDeclaration.loading || evidenceUploading || evidenceAnalyzing;
 
   const handlePublicationUrlBlur = async () => {
     const url = form.getFieldValue('url')?.trim();
@@ -401,8 +523,11 @@ export const Declarations = () => {
       } else {
         toast.success(`Đã tự động lấy thông tin từ liên kết bài báo.${quartile}${item}`);
       }
-    } catch {
-      toast.error('Không thể lấy metadata từ liên kết này');
+    } catch (error) {
+      const detail = axios.isAxiosError(error)
+        ? error.response?.data?.message || error.response?.data?.detail
+        : undefined;
+      toast.error(detail ? `Không thể lấy metadata: ${detail}` : 'Không thể lấy metadata từ liên kết này');
     }
   };
 
@@ -426,11 +551,22 @@ export const Declarations = () => {
     <Page
       title={isManager ? 'Duyệt kê khai' : 'Kê khai hoạt động'}
       actions={
-        <Space>
+        <Space wrap>
           <Button title="Làm mới trạng thái" icon={<ReloadOutlined />} onClick={loadData} />
           <Button icon={<DownloadOutlined />} onClick={exportDeclarations}>
             Xuất báo cáo
           </Button>
+          <Select
+            value={selectedYearId}
+            loading={academicYears.loading}
+            placeholder="Chọn năm học"
+            style={{ width: 170 }}
+            options={(academicYears.data ?? []).map((year) => ({ label: year.name, value: year.id }))}
+            onChange={(value) => {
+              setReviewing(null);
+              setSelectedYearId(value);
+            }}
+          />
           {isManager ? (
             <Select
               value={managerStatus}
@@ -496,7 +632,7 @@ export const Declarations = () => {
             title: 'Giờ quy đổi',
             dataIndex: 'calculatedHours',
             key: 'calculatedHours',
-            render: (value: number | null) => value ?? 'Chưa tính',
+            render: (value: number | null) => formatHours(value),
           },
           {
             title: 'Phân tích minh chứng',
@@ -681,7 +817,7 @@ export const Declarations = () => {
                       return true;
                     }}
                   >
-                    <Button icon={<UploadOutlined />}>Chọn PDF</Button>
+                    <Button icon={<UploadOutlined />} loading={evidenceAnalyzing}>Chọn PDF</Button>
                   </Upload>
                 </Form.Item>
               )}
@@ -847,7 +983,7 @@ export const Declarations = () => {
                   : 'Không áp dụng'}
               </Descriptions.Item>
               <Descriptions.Item label="Giờ quy đổi">
-                {reviewing.calculatedHours ?? 'Chưa tính'}
+                {formatHours(reviewing.calculatedHours)}
               </Descriptions.Item>
               <Descriptions.Item label="Minh chứng">
                 <Space wrap>

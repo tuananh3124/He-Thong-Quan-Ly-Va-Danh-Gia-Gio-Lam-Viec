@@ -32,12 +32,14 @@ export class DeclarationsController {
 
   @Get()
   @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'academicYearId', required: false })
   list(
     @Payload('userId') userId: IPayloadType['userId'],
     @Payload('role') role: IPayloadType['role'],
     @Query('status') status?: string,
+    @Query('academicYearId') academicYearId?: string,
   ) {
-    return this.declarationsService.list(userId, role, status);
+    return this.declarationsService.list(userId, role, status, academicYearId);
   }
 
   @Get('manager-summary')
@@ -45,8 +47,9 @@ export class DeclarationsController {
   managerSummary(
     @Payload('userId') userId: IPayloadType['userId'],
     @Payload('role') role: IPayloadType['role'],
+    @Query('academicYearId') academicYearId?: string,
   ) {
-    return this.declarationsService.managerSummary(userId, role);
+    return this.declarationsService.managerSummary(userId, role, academicYearId);
   }
 
   @Get('duplicate-check')
@@ -78,6 +81,32 @@ export class DeclarationsController {
   @Roles(ROLE.Staff)
   metadataFromUrl(@Body() dto: DeclarationUrlMetadataDto) {
     return this.declarationsService.metadataFromUrl(dto.url);
+  }
+
+  @Post('analyze-evidence')
+  @Roles(ROLE.Staff)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+      required: ['file'],
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 20 * 1024 * 1024 },
+      fileFilter: (_request, file, callback) => {
+        if (file.mimetype !== 'application/pdf' || extname(file.originalname).toLowerCase() !== '.pdf') {
+          callback(new BadRequestException('Chỉ hỗ trợ tệp PDF minh chứng'), false);
+          return;
+        }
+        callback(null, true);
+      },
+    }),
+  )
+  analyzeEvidence(@UploadedFile() file?: Express.Multer.File) {
+    return this.declarationsService.analyzeEvidenceFile(file);
   }
 
   @Patch(':id')

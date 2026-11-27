@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import re
+import unicodedata
 from typing import Any
 
 
@@ -37,6 +38,19 @@ def _number(value: Any) -> float | None:
         return None
 
 
+def _is_invalid_course_name(value: Any) -> bool:
+    """Reject placeholders and shifted numeric cells as course names."""
+    text = _clean(value)
+    normalized = unicodedata.normalize("NFD", text.lower().replace("đ", "d"))
+    normalized = "".join(char for char in normalized if unicodedata.category(char) != "Mn")
+    normalized = re.sub(r"\s+", " ", normalized)
+    if not normalized or normalized in {"khong co", "-", "—", "–"}:
+        return True
+    # A course title must contain descriptive text. Values such as ``3`` or
+    # ``3 - 1`` indicate that the PDF/Word columns were shifted during OCR.
+    return bool(re.fullmatch(r"\d+(?:\s*[-/]\s*\d+)?", normalized))
+
+
 def _header_key(value: Any) -> str | None:
     text = _clean(value).lower()
     # Specific numeric columns must be checked before generic text such as
@@ -61,7 +75,7 @@ def _header_key(value: Any) -> str | None:
 def _row_from_mapping(values: dict[str, Any], row_number: int, source_text: str = "") -> dict[str, Any] | None:
     name = _clean(values.get("lecturer_name"))
     course = _clean(values.get("course_name"))
-    if not name:
+    if not name or _is_invalid_course_name(course):
         return None
     normalized_name = name.lower().replace(".", " ")
     header_names = {"tt", "stt", "họ tên", "họ và tên", "giảng viên", "giáo viên", "lecturer", "teacher"}
@@ -91,6 +105,29 @@ def _row_from_mapping(values: dict[str, Any], row_number: int, source_text: str 
         "quantity_unit": quantity_unit,
         "source_text": source_text or " | ".join(_clean(value) for value in values.values() if _clean(value)),
     }
+
+
+def _deduplicate_rows(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+    """Remove exact repeated rows while preserving distinct teaching components."""
+    seen: set[tuple[Any, ...]] = set()
+    unique: list[dict[str, Any]] = []
+    for row in rows:
+        key = (
+            re.sub(r"\s+", " ", _clean(row.get("lecturer_name")).lower()),
+            re.sub(r"\s+", " ", _clean(row.get("course_name")).lower()),
+            re.sub(r"\s+", " ", _clean(row.get("class_name")).lower()),
+            re.sub(r"\s+", " ", _clean(row.get("education_level")).lower()),
+            row.get("credits"),
+            row.get("periods"),
+            row.get("theory_periods"),
+            row.get("practical_periods"),
+            row.get("self_study_periods"),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(row)
+    return unique, len(rows) - len(unique)
 
 
 def _guidance_quantity(value: Any) -> float | None:
@@ -156,7 +193,7 @@ def _extract_tables(data: bytes) -> list[dict[str, Any]]:
                 headers = [_header_key(cell) for cell in table[header_index]]
                 for row_index, row in enumerate(table[header_index + 1 :], start=header_index + 1):
                     values = {key: row[column] for column, key in enumerate(headers) if key and column < len(row)}
-                    parsed = _row_from_mapping(values, row_index + 1)
+                    parsed = _row_from_mapping(values, row_index + 1, " | ".join(_clean(cell) for cell in row if _clean(cell)))
                     if parsed:
                         rows.append(parsed)
     return rows
@@ -254,7 +291,7 @@ def _extract_docx_rows(data: bytes) -> tuple[list[dict[str, Any]], list[dict[str
                     "self_study_periods": _number(row[9]) if len(row) > 9 else None,
                 }
                 parsed = _row_from_mapping(values, row_index + 1, source_text)
-                if parsed and _clean(parsed["course_name"]).lower() not in {"không có", "khong co", "-"}:
+                if parsed:
                     parsed["quantity"] = periods or credits or 1
                     parsed["quantity_unit"] = "tiết" if periods else ("tín chỉ" if credits is not None else "lần")
                     rows.append(parsed)
@@ -299,6 +336,9 @@ def parse_teaching_assignment_document(data: bytes, filename: str) -> dict[str, 
     else:
         raise ValueError("Chỉ hỗ trợ PDF và Word .docx")
 
+    rows, duplicate_count = _deduplicate_rows(rows)
+    if duplicate_count:
+        warnings.append(f"Đã loại bỏ {duplicate_count} dòng phân công trùng lặp.")
     rows = rows[:500]
     # Header rows may be removed from a multi-level Word table. Renumber the
     # remaining data rows so the UI always shows a continuous sequence.

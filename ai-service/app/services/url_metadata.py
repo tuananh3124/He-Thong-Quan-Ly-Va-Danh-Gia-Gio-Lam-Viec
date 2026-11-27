@@ -228,5 +228,5 @@ async def fetch_url_metadata(url: str) -> dict:
                 result = await _enrich_pdf_ranking(analyze_pdf(response.content).model_dump())
                 result.update({"source_url": current, "content_type": "application/pdf", "model": f"{result['model']}+url"})
                 return result
-                return await _extract_html(current, response.content)
+            return await _extract_html(current, response.content)
     raise ValueError("Too many redirects while fetching URL")

@@ -19,9 +19,9 @@ export class UpdateUserDto {
   @ApiProperty({ required: false, enum: Object.values(ROLE) })
   role?: ROLE_TYPE;
 
-  @IsIn(['LECTURER', 'RESEARCHER'])
+  @IsIn(['LECTURER', 'RESEARCHER', 'LECTURER_RESEARCHER'])
   @IsOptional()
-  @ApiProperty({ required: false, enum: ['LECTURER', 'RESEARCHER'] })
+  @ApiProperty({ required: false, enum: ['LECTURER', 'RESEARCHER', 'LECTURER_RESEARCHER'] })
   staffCategory?: STAFF_CATEGORY_TYPE | null;
 
   @IsString()

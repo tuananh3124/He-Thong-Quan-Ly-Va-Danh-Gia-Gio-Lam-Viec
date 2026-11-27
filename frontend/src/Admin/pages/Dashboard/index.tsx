@@ -1,18 +1,48 @@
-import { useEffect } from 'react';
-import { Alert, Card, Col, Row, Statistic } from 'antd';
+import { useEffect, useState } from 'react';
+import { Alert, Card, Col, Row, Select, Space, Statistic, Typography } from 'antd';
 import { CheckCircleOutlined, FileProtectOutlined, SettingOutlined } from '@ant-design/icons';
 import { Page } from '@/components/ui';
-import { useManagerSummary } from '@/services';
+import { useAcademicYears, useManagerSummary } from '@/services';
 
 export const AdminDashboard = () => {
-  const summary = useManagerSummary();
+  const academicYears = useAcademicYears({ params: { activeOnly: false } });
+  const [selectedYearId, setSelectedYearId] = useState<string>();
+  const summary = useManagerSummary({
+    params: selectedYearId ? { academicYearId: selectedYearId } : undefined,
+  });
+
+  useEffect(() => {
+    academicYears.fetchData();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedYearId && academicYears.data?.length) {
+      const activeYear = academicYears.data.find((year) => year.isActive) ?? academicYears.data[0];
+      setSelectedYearId(activeYear.id);
+    }
+  }, [academicYears.data, selectedYearId]);
 
   useEffect(() => {
     summary.fetchData();
-  }, []);
+  }, [selectedYearId]);
 
   return (
-    <Page title="Tổng quan quản trị">
+    <Page
+      title="Tổng quan quản trị"
+      actions={
+        <Space>
+          <Typography.Text type="secondary">Năm học</Typography.Text>
+          <Select
+            value={selectedYearId}
+            loading={academicYears.loading}
+            placeholder="Chọn năm học"
+            style={{ width: 170 }}
+            options={(academicYears.data ?? []).map((year) => ({ label: year.name, value: year.id }))}
+            onChange={setSelectedYearId}
+          />
+        </Space>
+      }
+    >
       <Alert
         showIcon
         type="info"

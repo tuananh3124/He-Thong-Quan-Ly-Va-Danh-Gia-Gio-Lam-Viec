@@ -44,10 +44,10 @@ export const Login = () => {
     >
       <Flex vertical align="center" gap="small" style={{ marginBottom: 28 }}>
         <img src={logo} alt="Giờ chuẩn" style={{ width: 56, height: 56 }} />
-        <Title level={2} style={{ margin: 0 }}>
-          Đăng nhập hệ thống
+        <Title level={2} style={{ margin: 0, textAlign: 'center' }}>
+          Hệ thống quản lý giờ làm việc tiêu chuẩn
         </Title>
-        <Text type="secondary">Quản lý và đánh giá giờ làm việc tiêu chuẩn</Text>
+        <Text type="secondary">Đăng nhập để tiếp tục</Text>
       </Flex>
 
       <Form form={form} layout="vertical" onFinish={handleSubmit} style={{ width: '100%' }}>
