@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreatePublicationSourceDto {
   @IsString()
@@ -11,4 +11,9 @@ export class CreatePublicationSourceDto {
   @IsNotEmpty()
   @ApiProperty({ example: '1' })
   classificationId: string;
+
+  @IsOptional()
+  @IsIn(['Q1', 'Q2', 'Q3', 'Q4'])
+  @ApiProperty({ required: false, enum: ['Q1', 'Q2', 'Q3', 'Q4'] })
+  quartile?: string;
 }

@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ROLE } from '@projectname/shared';
 import { Roles } from '@/common';
 import { CreatePublicationClassificationDto } from './dto/create-classification';
 import { CreatePublicationSourceDto } from './dto/create-source';
+import { UpdatePublicationSourceDto } from './dto/update-source';
 import { PublicationCatalogService } from './service';
 
 @Controller('publication-catalog')
@@ -33,5 +34,11 @@ export class PublicationCatalogController {
   @Roles(ROLE.Admin)
   createSource(@Body() dto: CreatePublicationSourceDto) {
     return this.publicationCatalogService.createSource(dto);
+  }
+
+  @Patch('sources/:id')
+  @Roles(ROLE.Admin)
+  updateSource(@Param('id') id: string, @Body() dto: UpdatePublicationSourceDto) {
+    return this.publicationCatalogService.updateSource(id, dto);
   }
 }

@@ -1,6 +1,7 @@
 """FastAPI application entrypoint."""
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -9,8 +10,9 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.config import get_settings
 from app.database import init_db
-from app.routers import analyze, analyze_url, documents, query
+from app.routers import analyze, analyze_url, documents, query, teaching_assignments
 from app.services.ratelimit import check_rate_limit
+from app.services.scimago_sync import download_latest_scimago
 
 STATIC_DIR = Path(__file__).parent / "static"
 RATE_LIMITED_PREFIXES = ("/query", "/documents", "/analyze")
@@ -25,7 +27,23 @@ async def lifespan(app: FastAPI):
             init_db()
         except Exception as exc:  # noqa: BLE001
             print(f"[startup] init_db skipped: {exc}")
-    yield
+    sync_task = None
+    if get_settings().scimago_auto_update:
+        async def periodic_scimago_sync():
+            while True:
+                try:
+                    result = await download_latest_scimago()
+                    print(f"[scimago] {result}")
+                except Exception as exc:  # noqa: BLE001 — retain the previous snapshot on sync failure
+                    print(f"[scimago] update skipped: {exc}")
+                await asyncio.sleep(get_settings().scimago_update_interval_seconds)
+
+        sync_task = asyncio.create_task(periodic_scimago_sync())
+    try:
+        yield
+    finally:
+        if sync_task:
+            sync_task.cancel()
 
 
 app = FastAPI(
@@ -43,6 +61,7 @@ app.include_router(documents.router)
 app.include_router(query.router)
 app.include_router(analyze.router)
 app.include_router(analyze_url.router)
+app.include_router(teaching_assignments.router)
 
 
 @app.middleware("http")

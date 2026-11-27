@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router-dom';
-import { Dashboard, Declarations, HelpCenter, Login, ManagerDashboard, Settings as SettingPage } from '@/pages';
+import { Dashboard, Declarations, HelpCenter, Login, ManagerDashboard, ManagerTeachingAssignments, Settings as SettingPage } from '@/pages';
 import type { IRouteType } from '@/types';
-import { BarChart3, ClipboardList, HelpCircle, LayoutDashboard, Settings } from 'lucide-react';
+import { BarChart3, ClipboardCheck, ClipboardList, HelpCircle, LayoutDashboard, Settings } from 'lucide-react';
 import { ROLE } from '@projectname/shared';
 
 const NotFound = () => {
@@ -46,9 +46,22 @@ export const routes: IRouteType[] = [
     path: '/declarations',
     element: <Declarations />,
     handle: {
+      role: [ROLE.Staff, ROLE.Admin],
       menu: {
         label: 'Kê khai hoạt động',
         icon: <ClipboardList size={18} />,
+      },
+    },
+  },
+  {
+    id: 'manager-declarations',
+    path: '/manager/declarations',
+    element: <Declarations />,
+    handle: {
+      role: [ROLE.Manager],
+      menu: {
+        label: 'Kê khai & kiểm tra',
+        icon: <ClipboardCheck size={18} />,
       },
     },
   },
@@ -61,6 +74,18 @@ export const routes: IRouteType[] = [
       menu: {
         label: 'Thống kê đơn vị',
         icon: <BarChart3 size={18} />,
+      },
+    },
+  },
+  {
+    id: 'manager-teaching-assignments',
+    path: '/manager/teaching-assignments',
+    element: <ManagerTeachingAssignments />,
+    handle: {
+      role: [ROLE.Manager],
+      menu: {
+        label: 'Nhập phân công giảng dạy',
+        icon: <ClipboardList size={18} />,
       },
     },
   },

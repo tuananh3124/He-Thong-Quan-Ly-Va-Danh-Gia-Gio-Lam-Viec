@@ -73,6 +73,15 @@ const serialize = (declaration: any) => {
   };
 };
 
+const normalizeComparable = (value?: string | null) =>
+  (value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/https?:\/\/doi\.org\//g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
 @Injectable()
 export class DeclarationsService {
   constructor(
@@ -162,15 +171,40 @@ export class DeclarationsService {
       .trim();
   }
 
-  private async matchPublicationSource(sourceName?: string | null) {
+  private async matchPublicationSource(sourceName?: string | null, quartile?: string | null) {
     if (!sourceName) return undefined;
     const normalized = this.normalizeSource(sourceName);
     const sources = await this.prisma.publication_sources.findMany();
-    const match = sources.find((source) => {
+    const matches = sources.filter((source) => {
       const candidate = this.normalizeSource(source.name);
       return candidate === normalized || candidate.includes(normalized) || normalized.includes(candidate);
     });
+    const normalizedQuartile = quartile?.toUpperCase();
+    const match = normalizedQuartile
+      ? matches.find((source) => source.quartile === normalizedQuartile) || matches[0]
+      : matches[0];
     return match?.id;
+  }
+
+  private quartileRuleCode(quartile?: string | null) {
+    const normalized = quartile?.toUpperCase();
+    return normalized && ['Q1', 'Q2', 'Q3', 'Q4'].includes(normalized)
+      ? `RESEARCH_ARTICLE_WOS_SCOPUS_${normalized}`
+      : undefined;
+  }
+
+  private async ruleCodeFromPublicationSource(sourceId?: bigint) {
+    if (!sourceId) return undefined;
+    const source = await this.prisma.publication_sources.findUnique({
+      where: { id: sourceId },
+      include: { classification: true },
+    });
+    if (!source || !['Q1', 'Q2', 'Q3', 'Q4'].includes(source.quartile || '')) return undefined;
+    const classification = this.normalizeSource(source.classification.name);
+    if (!classification.includes('scopus') && !classification.includes('isi') && !classification.includes('scie')) {
+      return undefined;
+    }
+    return this.quartileRuleCode(source.quartile);
   }
 
   private async enrichFromUrl(dto: CreateDeclarationDto) {
@@ -330,6 +364,55 @@ export class DeclarationsService {
     };
   }
 
+  async duplicateCheck(
+    userId: string,
+    params: { name?: string; doi?: string; url?: string; academicYearId?: string; excludeId?: string },
+  ) {
+    const normalizedName = normalizeComparable(params.name);
+    const normalizedDoi = normalizeComparable(params.doi);
+    const normalizedUrl = normalizeComparable(params.url);
+    if (!normalizedName && !normalizedDoi && !normalizedUrl) {
+      return { hasDuplicates: false, matches: [] };
+    }
+
+    const declarations = await this.prisma.declarations.findMany({
+      where: {
+        userId: parseId(userId, 'userId'),
+        academicYearId: params.academicYearId ? parseId(params.academicYearId, 'academicYearId') : undefined,
+        id: params.excludeId ? { not: parseId(params.excludeId, 'excludeId') } : undefined,
+      },
+      select: {
+        id: true,
+        name: true,
+        doi: true,
+        url: true,
+        status: true,
+        calculatedHours: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const matches = declarations
+      .filter((item) => {
+        const sameDoi = normalizedDoi && normalizeComparable(item.doi) === normalizedDoi;
+        const sameUrl = normalizedUrl && normalizeComparable(item.url) === normalizedUrl;
+        const sameName = normalizedName && normalizeComparable(item.name) === normalizedName;
+        return Boolean(sameDoi || sameUrl || sameName);
+      })
+      .map((item) => ({
+        id: item.id.toString(),
+        name: item.name,
+        doi: item.doi,
+        url: item.url,
+        status: item.status,
+        calculatedHours: item.calculatedHours,
+        createdAt: item.createdAt,
+      }));
+
+    return { hasDuplicates: matches.length > 0, matches };
+  }
+
   async create(userId: string, dto: CreateDeclarationDto) {
     const enriched = await this.enrichFromUrl(dto);
     dto = enriched.dto;
@@ -338,16 +421,18 @@ export class DeclarationsService {
     const academicYearId = parseId(dto.academicYearId, 'academicYearId');
     const sourceId = dto.sourceId
       ? parseId(dto.sourceId, 'sourceId')
-      : await this.matchPublicationSource(enriched.metadata?.source_name);
+      : await this.matchPublicationSource(enriched.metadata?.source_name, enriched.metadata?.quartile);
 
     const academicYear = await this.prisma.academic_years.findUnique({
       where: { id: academicYearId },
     });
     if (!academicYear) throw new NotFoundException('Academic year not found');
 
+    let catalogRuleCode: string | undefined;
     if (sourceId) {
       const source = await this.prisma.publication_sources.findUnique({ where: { id: sourceId } });
       if (!source) throw new NotFoundException('Publication source not found');
+      catalogRuleCode = await this.ruleCodeFromPublicationSource(sourceId);
     }
 
     const declaration = await this.prisma.declarations.create({
@@ -356,7 +441,8 @@ export class DeclarationsService {
         academicYearId,
         activityType: dto.activityType,
         name: dto.name?.trim() || enriched.metadata?.title || 'Minh chứng chờ phân tích',
-        conversionRuleCode: dto.conversionRuleCode?.trim() || null,
+        conversionRuleCode:
+          dto.conversionRuleCode?.trim() || enriched.metadata?.suggested_rule_code || catalogRuleCode || null,
         quantity: dto.quantity ?? 1,
         publicationYear: dto.publicationYear,
         doi: dto.doi?.trim() || undefined,
@@ -404,12 +490,14 @@ export class DeclarationsService {
     const academicYearId = parseId(dto.academicYearId, 'academicYearId');
     const sourceId = dto.sourceId
       ? parseId(dto.sourceId, 'sourceId')
-      : (await this.matchPublicationSource(enriched.metadata?.source_name)) ?? null;
+      : (await this.matchPublicationSource(enriched.metadata?.source_name, enriched.metadata?.quartile)) ?? null;
     const academicYear = await this.prisma.academic_years.findUnique({ where: { id: academicYearId } });
     if (!academicYear) throw new NotFoundException('Academic year not found');
+    let catalogRuleCode: string | undefined;
     if (sourceId) {
       const source = await this.prisma.publication_sources.findUnique({ where: { id: sourceId } });
       if (!source) throw new NotFoundException('Publication source not found');
+      catalogRuleCode = await this.ruleCodeFromPublicationSource(sourceId);
     }
 
     await this.prisma.declarations.update({
@@ -417,7 +505,8 @@ export class DeclarationsService {
       data: {
         activityType: dto.activityType,
         name: dto.name?.trim() || enriched.metadata?.title || 'Minh chứng chờ phân tích',
-        conversionRuleCode: dto.conversionRuleCode?.trim() || null,
+        conversionRuleCode:
+          dto.conversionRuleCode?.trim() || enriched.metadata?.suggested_rule_code || catalogRuleCode || null,
         quantity: dto.quantity ?? 1,
         publicationYear: dto.publicationYear ?? null,
         doi: dto.doi?.trim() || null,
@@ -524,7 +613,7 @@ export class DeclarationsService {
           )
         : [];
       const aiSourceId = !declaration.sourceId
-        ? await this.matchPublicationSource(aiResult.source_name)
+        ? await this.matchPublicationSource(aiResult.source_name, aiResult.quartile)
         : undefined;
       const aiData: any = {
         aiConfidence: typeof aiResult.confidence === 'number' ? aiResult.confidence : null,
@@ -538,8 +627,9 @@ export class DeclarationsService {
         aiData.publicationYear = aiResult.publication_year;
       }
       if (!declaration.doi && aiResult.doi) aiData.doi = aiResult.doi;
-      if (!declaration.conversionRuleCode && aiResult.suggested_rule_code) {
-        aiData.conversionRuleCode = aiResult.suggested_rule_code;
+      if (!declaration.conversionRuleCode) {
+        aiData.conversionRuleCode =
+          aiResult.suggested_rule_code || (aiSourceId ? await this.ruleCodeFromPublicationSource(aiSourceId) : undefined);
       }
       if (aiSourceId) aiData.sourceId = aiSourceId;
       if (!declaration.authors?.length && aiAuthors.length) {

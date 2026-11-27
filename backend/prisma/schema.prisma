@@ -77,6 +77,7 @@ model publication_sources {
   id               BigInt                      @id @default(autoincrement())
   name             String
   classificationId BigInt
+  quartile         String?
   classification   publication_classifications @relation(fields: [classificationId], references: [id])
   declarations     declarations[]
 

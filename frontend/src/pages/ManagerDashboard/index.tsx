@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
-import { Card, Col, Progress, Row, Statistic, Table, Tag, Typography } from 'antd';
+import { Button, Card, Col, Progress, Row, Space, Statistic, Table, Tag, Typography } from 'antd';
+import { DownloadOutlined } from '@ant-design/icons';
 import { BarChart3 } from 'lucide-react';
 import { Page } from '@/components/ui';
 import { useManagerSummary } from '@/services';
+import { downloadCsv } from '@/utils';
 
 const activityLabels: Record<string, string> = {
   TEACHING: 'Giảng dạy',
@@ -22,8 +24,35 @@ export const ManagerDashboard = () => {
   const reviewed = (totals?.approved ?? 0) + (totals?.rejected ?? 0);
   const reviewRate = totals?.total ? Math.round((reviewed / totals.total) * 100) : 0;
 
+  const exportSummary = () => {
+    downloadCsv(
+      `bao-cao-don-vi-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Cán bộ', 'Email', 'Nhóm', 'Số bản kê khai', 'Chờ duyệt', 'Đã duyệt', 'Bị từ chối', 'Giờ quy đổi'],
+      (summary.data?.staff ?? []).map((item) => [
+        item.name,
+        item.email,
+        item.staffCategory === 'RESEARCHER' ? 'Nghiên cứu viên' : 'Giảng viên',
+        item.declarationCount,
+        item.submittedCount,
+        item.approvedCount,
+        item.rejectedCount,
+        item.calculatedHours,
+      ]),
+    );
+  };
+
   return (
-    <Page title="Thống kê đơn vị" actions={<BarChart3 size={22} />}>
+    <Page
+      title="Thống kê đơn vị"
+      actions={
+        <Space>
+          <Button icon={<DownloadOutlined />} onClick={exportSummary}>
+            Xuất báo cáo
+          </Button>
+          <BarChart3 size={22} />
+        </Space>
+      }
+    >
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={6}><Card><Statistic title="Tổng bản kê khai" value={totals?.total ?? 0} /></Card></Col>
         <Col xs={24} sm={12} lg={6}><Card><Statistic title="Chờ duyệt" value={totals?.submitted ?? 0} valueStyle={{ color: '#1677ff' }} /></Card></Col>

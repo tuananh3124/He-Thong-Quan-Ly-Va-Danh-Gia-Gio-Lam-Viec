@@ -49,6 +49,25 @@ export class DeclarationsController {
     return this.declarationsService.managerSummary(userId, role);
   }
 
+  @Get('duplicate-check')
+  @Roles(ROLE.Staff)
+  duplicateCheck(
+    @Payload('userId') userId: IPayloadType['userId'],
+    @Query('name') name?: string,
+    @Query('doi') doi?: string,
+    @Query('url') url?: string,
+    @Query('academicYearId') academicYearId?: string,
+    @Query('excludeId') excludeId?: string,
+  ) {
+    return this.declarationsService.duplicateCheck(userId, {
+      name,
+      doi,
+      url,
+      academicYearId,
+      excludeId,
+    });
+  }
+
   @Post()
   @Roles(ROLE.Staff)
   create(@Payload('userId') userId: IPayloadType['userId'], @Body() dto: CreateDeclarationDto) {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import {
+  Alert,
   Button,
   Descriptions,
   Form,
@@ -28,6 +29,7 @@ import {
 import { ACTIVITY_TYPE, ROLE, STAFF_CATEGORY } from '@projectname/shared';
 import { Page } from '@/components/ui';
 import { useGlobal, useMessage } from '@/hooks';
+import { downloadCsv } from '@/utils';
 import {
   useAcademicYears,
   useCalculateDeclaration,
@@ -79,10 +81,11 @@ export const Declarations = () => {
   const [rejecting, setRejecting] = useState(false);
   const [action, setAction] = useState<{ id: string; type: 'calculate' | 'submit' } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [managerStatus, setManagerStatus] = useState<'ALL' | 'SUBMITTED' | 'APPROVED' | 'REJECTED'>('SUBMITTED');
   const [form] = Form.useForm<CreateDeclarationRequest>();
   const [reviewForm] = Form.useForm<ReviewDeclarationRequest>();
   const declarations = useDeclarations({
-    params: isManager ? { status: 'SUBMITTED' } : undefined,
+    params: isManager ? { status: managerStatus === 'ALL' ? undefined : managerStatus } : undefined,
   });
   const academicYears = useAcademicYears();
   const sources = usePublicationSources();
@@ -117,7 +120,7 @@ export const Declarations = () => {
 
   const handleSaved = async (declaration: Declaration) => {
     const file = evidenceFileList[0]?.originFileObj;
-    if (file) {
+    if (file && form.getFieldValue('activityType') !== ACTIVITY_TYPE.TEACHING) {
       setEvidenceUploading(true);
       const body = new FormData();
       body.append('file', file);
@@ -175,7 +178,7 @@ export const Declarations = () => {
 
   useEffect(() => {
     loadData();
-  }, [isManager]);
+  }, [isManager, managerStatus]);
 
   useEffect(() => {
     const refreshVisibleData = () => {
@@ -190,7 +193,7 @@ export const Declarations = () => {
       window.removeEventListener('focus', refreshVisibleData);
       document.removeEventListener('visibilitychange', refreshVisibleData);
     };
-  }, [isManager]);
+  }, [isManager, managerStatus]);
 
   useEffect(() => {
     if (isManager || editingId || !activeAcademicYear) return;
@@ -220,12 +223,42 @@ export const Declarations = () => {
     });
   }, [deletingId]);
 
-  const handleSave = (values: CreateDeclarationRequest) => {
+  const persistDeclaration = (values: CreateDeclarationRequest) => {
     if (editingId) {
       updateDeclaration.fetchData({ data: values });
     } else {
       createDeclaration.fetchData({ data: values });
     }
+  };
+
+  const handleSave = async (values: CreateDeclarationRequest) => {
+    try {
+      const response = await axios.get(`${apiBaseUrl}/declarations/duplicate-check`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          name: values.name,
+          doi: values.doi,
+          url: values.url,
+          academicYearId: values.academicYearId,
+          excludeId: editingId ?? undefined,
+        },
+      });
+      const duplicateResult = response.data?.data ?? response.data;
+      if (duplicateResult?.hasDuplicates) {
+        const firstMatch = duplicateResult.matches?.[0];
+        Modal.confirm({
+          title: 'Phát hiện kê khai có thể bị trùng',
+          content: `Đã có bản ghi “${firstMatch?.name ?? 'cùng thông tin'}” trong năm học này. Bạn vẫn muốn lưu bản kê khai?`,
+          okText: 'Vẫn lưu',
+          cancelText: 'Kiểm tra lại',
+          onOk: () => persistDeclaration(values),
+        });
+        return;
+      }
+    } catch {
+      // Duplicate checking is advisory; saving remains available if the check service is unavailable.
+    }
+    persistDeclaration(values);
   };
 
   const handleCalculate = async (record: Declaration) => {
@@ -280,6 +313,22 @@ export const Declarations = () => {
     }
   };
 
+  const exportDeclarations = () => {
+    downloadCsv(
+      `ke-khai-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Tên hoạt động', 'Loại hoạt động', 'Trạng thái', 'Giờ quy đổi', 'Năm học', 'DOI', 'URL'],
+      (declarations.data ?? []).map((record) => [
+        record.name,
+        activityOptions.find((item) => item.value === record.activityType)?.label ?? record.activityType,
+        statusLabel[record.status] ?? record.status,
+        record.calculatedHours ?? '',
+        record.academicYear?.name ?? '',
+        record.doi ?? '',
+        record.url ?? '',
+      ]),
+    );
+  };
+
   const openCreate = () => {
     setEditingId(null);
     setEditingEvidenceName(null);
@@ -328,16 +377,30 @@ export const Declarations = () => {
         }));
       }
       if (!current.sourceId && metadata.source_name) {
-        const source = (sources.data ?? []).find(
+        const sourceMatches = (sources.data ?? []).filter(
           (item) => item.name.toLowerCase() === String(metadata.source_name).toLowerCase(),
         );
-        if (source) fields.sourceId = source.id;
+        const source =
+          sourceMatches.find((item) => item.quartile === metadata.quartile) || sourceMatches[0];
+        if (source) {
+          fields.sourceId = source.id;
+          if (!current.conversionRuleCode && !metadata.suggested_rule_code && source.quartile) {
+            fields.conversionRuleCode = `RESEARCH_ARTICLE_WOS_SCOPUS_${source.quartile}`;
+          }
+        }
       }
       form.setFieldsValue(fields);
       const item = metadata.publication_item_code
         ? ` Mục tham chiếu: ${metadata.publication_item_code}${metadata.publication_item_label ? ` - ${metadata.publication_item_label}` : ''}.`
         : '';
-      toast.success(`Đã tự động lấy thông tin từ liên kết bài báo.${item}`);
+      const quartile = metadata.quartile ? ` Quartile: ${metadata.quartile}.` : '';
+      if (metadata.quartile_status && metadata.quartile_status !== 'verified') {
+        toast.warning(
+          `Đã lấy metadata${metadata.issn ? ` (ISSN ${metadata.issn})` : ''}, nhưng chưa xác minh được Quartile từ cơ sở dữ liệu xếp hạng.`,
+        );
+      } else {
+        toast.success(`Đã tự động lấy thông tin từ liên kết bài báo.${quartile}${item}`);
+      }
     } catch {
       toast.error('Không thể lấy metadata từ liên kết này');
     }
@@ -365,6 +428,22 @@ export const Declarations = () => {
       actions={
         <Space>
           <Button title="Làm mới trạng thái" icon={<ReloadOutlined />} onClick={loadData} />
+          <Button icon={<DownloadOutlined />} onClick={exportDeclarations}>
+            Xuất báo cáo
+          </Button>
+          {isManager ? (
+            <Select
+              value={managerStatus}
+              style={{ width: 170 }}
+              onChange={setManagerStatus}
+              options={[
+                { value: 'SUBMITTED', label: 'Chờ kiểm tra' },
+                { value: 'ALL', label: 'Tất cả hồ sơ' },
+                { value: 'APPROVED', label: 'Đã duyệt' },
+                { value: 'REJECTED', label: 'Từ chối' },
+              ]}
+            />
+          ) : null}
           {!isManager ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
               Tạo kê khai
@@ -420,7 +499,7 @@ export const Declarations = () => {
             render: (value: number | null) => value ?? 'Chưa tính',
           },
           {
-            title: 'AI minh chứng',
+            title: 'Phân tích minh chứng',
             key: 'ai',
             render: (_: unknown, record: Declaration) => record.aiConfidence == null
               ? <Tag>Chưa phân tích</Tag>
@@ -433,9 +512,13 @@ export const Declarations = () => {
             key: 'actions',
             render: (_: unknown, record: Declaration) => (
               isManager ? (
-                <Button size="small" type="primary" onClick={() => setReviewing(record)}>
-                  Xem xét
-                </Button>
+                record.status === 'SUBMITTED' ? (
+                  <Button size="small" type="primary" onClick={() => setReviewing(record)}>
+                    Xem xét
+                  </Button>
+                ) : (
+                  <Tag color={statusColor[record.status]}>{statusLabel[record.status] ?? 'Đã xử lý'}</Tag>
+                )
               ) : (
                 <Space>
                   {record.status === 'DRAFT' || record.status === 'REJECTED' ? (
@@ -513,7 +596,7 @@ export const Declarations = () => {
                 showSearch
                 optionFilterProp="label"
                 loading={conversionRules.loading}
-                placeholder="AI tự đề xuất từ URL hoặc PDF nếu để trống"
+                placeholder="Tự động điền từ liên kết hoặc tệp minh chứng nếu có"
                 options={availableConversionRules.map((rule: ConversionRule) => ({
                   value: rule.code ?? rule.id,
                   label: `${rule.label ?? rule.code ?? 'Quy tắc'}${rule.classification?.name ? ` (${rule.classification.name})` : ''} · ${rule.minHours != null || rule.maxHours != null ? `${rule.minHours ?? rule.hours}–${rule.maxHours ?? rule.hours}` : rule.hours} giờ${rule.unit ? `/${rule.unit}` : ''}`,
@@ -551,7 +634,7 @@ export const Declarations = () => {
                 onChange={() => form.setFieldsValue({ conversionRuleCode: undefined })}
                 options={(sources.data ?? []).map((source) => ({
                   value: source.id,
-                  label: `${source.name} - ${source.classification?.name ?? ''}`,
+                  label: `${source.name} - ${source.classification?.name ?? ''}${source.quartile ? ` · ${source.quartile}` : ''}`,
                 }))}
               />
             </Form.Item>
@@ -576,20 +659,32 @@ export const Declarations = () => {
                 </Space>
               </Form.Item>
             ) : null}
-            <Form.Item label="Tệp minh chứng PDF">
-              <Upload
-                accept=".pdf,application/pdf"
-                maxCount={1}
-                fileList={evidenceFileList}
-                beforeUpload={() => false}
-                onChange={handleEvidenceChange}
-                onRemove={() => {
-                  setEvidenceFileList([]);
-                  return true;
-                }}
-              >
-                <Button icon={<UploadOutlined />}>Chọn PDF</Button>
-              </Upload>
+            <Form.Item noStyle shouldUpdate={(previous, current) => previous.activityType !== current.activityType}>
+              {({ getFieldValue }) => getFieldValue('activityType') === ACTIVITY_TYPE.TEACHING ? (
+                <Alert
+                  type="info"
+                  showIcon
+                  message="Phân công giảng dạy do quản lý nhập từ file tổng hợp"
+                  description="Bạn không cần tải file phân công riêng. Kết quả sẽ xuất hiện trong danh sách sau khi quản lý xử lý file."
+                  style={{ marginBottom: 16 }}
+                />
+              ) : (
+                <Form.Item label="Tệp minh chứng PDF">
+                  <Upload
+                    accept=".pdf,application/pdf"
+                    maxCount={1}
+                    fileList={evidenceFileList}
+                    beforeUpload={() => false}
+                    onChange={handleEvidenceChange}
+                    onRemove={() => {
+                      setEvidenceFileList([]);
+                      return true;
+                    }}
+                  >
+                    <Button icon={<UploadOutlined />}>Chọn PDF</Button>
+                  </Upload>
+                </Form.Item>
+              )}
             </Form.Item>
             <Form.Item noStyle shouldUpdate={(previous, current) => previous.activityType !== current.activityType}>
               {({ getFieldValue }) =>

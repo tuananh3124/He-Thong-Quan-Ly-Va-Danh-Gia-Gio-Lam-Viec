@@ -9,6 +9,29 @@ const prisma = new PrismaClient({ adapter });
 
 const roundsOfHashing = 10;
 
+const spreadsheetStaff = [
+  { name: 'Phạm Hồng Tung', email: 'pham.hong.tung@example.test', academicTitle: 'GVCC hạng 1', degree: 'GS', staffCategory: 'LECTURER' },
+  { name: 'Nguyễn Quang Ngọc', email: 'nguyen.quang.ngoc@example.test', academicTitle: 'GVCC hạng 1', degree: 'GS', staffCategory: 'LECTURER' },
+  { name: 'Trương Quang Hải', email: 'truong.quang.hai@example.test', academicTitle: 'GVCC hạng 1', degree: 'GS', staffCategory: 'LECTURER' },
+  { name: 'Nguyễn Thị Việt Thanh', email: 'nguyen.thi.viet.thanh@example.test', academicTitle: 'GVCC hạng 1', degree: 'PGS', staffCategory: 'LECTURER' },
+  { name: 'Vũ Kim Chi', email: 'vu.kim.chi@example.test', academicTitle: 'GVC hạng II', degree: 'TS', staffCategory: 'LECTURER' },
+  { name: 'Trần Thanh Hà', email: 'tran.thanh.ha@example.test', academicTitle: 'GV hạng III', degree: 'TS', staffCategory: 'LECTURER' },
+  { name: 'Lê Đình Tân', email: 'le.dinh.tan@example.test', academicTitle: 'GV hạng III', degree: 'TS', staffCategory: 'LECTURER' },
+  { name: 'Phạm Văn Lợi', email: 'pham.van.loi@example.test', academicTitle: 'NVC hạng II', degree: 'PGS', staffCategory: 'RESEARCHER' },
+  { name: 'Bùi Văn Tuấn', email: 'bui.van.tuan@example.test', academicTitle: 'NVC hạng III', degree: 'TS', staffCategory: 'RESEARCHER' },
+  { name: 'Phùng Thị Thanh Lâm', email: 'phung.thi.thanh.lam@example.test', academicTitle: 'NCV hạng II', degree: 'TS', staffCategory: 'RESEARCHER' },
+  { name: 'Nguyễn Thị Huệ', email: 'nguyen.thi.hue@example.test', academicTitle: 'NCV hạng III', degree: 'TS', staffCategory: 'RESEARCHER' },
+  { name: 'Vũ Đường Luân', email: 'vu.duong.luan@example.test', academicTitle: 'NCV hạng III', degree: 'ThS', staffCategory: 'RESEARCHER' },
+  { name: 'Tống Văn Lợi', email: 'tong.van.loi@example.test', academicTitle: 'NCV hạng III', degree: 'ThS', staffCategory: 'RESEARCHER' },
+  { name: 'Đặng Ngọc Hà', email: 'dang.ngoc.ha@example.test', academicTitle: 'NCV hạng III', degree: 'ThS', staffCategory: 'RESEARCHER' },
+  { name: 'Phạm Th. Thương Thương', email: 'pham.th.thuong.thuong@example.test', academicTitle: 'NCV hạng II', degree: 'ThS', staffCategory: 'RESEARCHER' },
+  { name: 'Giang Văn Trọng', email: 'giang.van.trong@example.test', academicTitle: 'NCV hạng III', degree: 'ThS', staffCategory: 'RESEARCHER' },
+  { name: 'Nguyễn Đức Minh', email: 'nguyen.duc.minh@example.test', academicTitle: 'NCV hạng III', degree: 'ThS', staffCategory: 'RESEARCHER' },
+  { name: 'Nguyễn Quang Anh', email: 'nguyen.quang.anh@example.test', academicTitle: 'NCV hạng III', degree: 'ThS', staffCategory: 'RESEARCHER' },
+  { name: 'Trần Thị Lan', email: 'tran.thi.lan@example.test', academicTitle: 'NCV hạng III', degree: 'ThS', staffCategory: 'RESEARCHER' },
+  { name: 'Nguyễn Dương Liễu', email: 'nguyen.duong.lieu@example.test', academicTitle: 'NCV hạng III', degree: 'ThS', staffCategory: 'RESEARCHER' },
+] as const;
+
 async function main() {
   const passwordTest = await bcrypt.hash('Abc123456', roundsOfHashing);
 
@@ -98,6 +121,33 @@ async function main() {
     });
   }
 
+  for (const staff of spreadsheetStaff) {
+    await prisma.users.upsert({
+      where: { email: staff.email },
+      update: {
+        name: staff.name,
+        password: passwordTest,
+        tenantId: tenant.id,
+        role: ROLE.Staff,
+        staffCategory: staff.staffCategory,
+        academicTitle: staff.academicTitle,
+        degree: staff.degree,
+        department: 'Viện Việt Nam học và Khoa học phát triển',
+      },
+      create: {
+        name: staff.name,
+        email: staff.email,
+        password: passwordTest,
+        tenantId: tenant.id,
+        role: ROLE.Staff,
+        staffCategory: staff.staffCategory,
+        academicTitle: staff.academicTitle,
+        degree: staff.degree,
+        department: 'Viện Việt Nam học và Khoa học phát triển',
+      },
+    });
+  }
+
   const academicYear = await prisma.academic_years.upsert({
     where: { name: '2025-2026' },
     update: { isActive: true },
@@ -148,11 +198,16 @@ async function main() {
   await prisma.publication_sources.upsert({
     where: { name_classificationId: { name: 'Sample Journal ISI', classificationId: isi.id } },
     update: {},
-    create: { name: 'Sample Journal ISI', classificationId: isi.id },
+    create: { name: 'Sample Journal ISI', classificationId: isi.id, quartile: 'Q1' },
   });
 
   const catalogSources = [
-    { name: 'Journal of Ethnobiology and Ethnomedicine', classificationId: scopus.id },
+    { name: 'Journal of Ethnobiology and Ethnomedicine', classificationId: scopus.id, quartile: null },
+    { name: 'Vietnam Journal of Earth Sciences', classificationId: scopus.id, quartile: 'Q2' },
+    { name: 'Biomedical Research and Therapy', classificationId: scopus.id, quartile: 'Q4' },
+    { name: 'Journal of Science and Transport Technology', classificationId: scopus.id, quartile: 'Q3' },
+    { name: 'Vietnam Journal of Science and Technology', classificationId: scopus.id, quartile: 'Q4' },
+    { name: 'CTU Journal of Innovation and Sustainable Development', classificationId: scopus.id, quartile: 'Q4' },
     { name: 'Tạp chí Khoa học Xã hội và Nhân văn', classificationId: domestic.id },
     { name: 'Tạp chí Khoa học xã hội Việt Nam', classificationId: domestic.id },
     { name: 'Tạp chí Nghiên cứu Văn hóa', classificationId: domestic.id },
@@ -165,7 +220,7 @@ async function main() {
   for (const source of catalogSources) {
     await prisma.publication_sources.upsert({
       where: { name_classificationId: { name: source.name, classificationId: source.classificationId } },
-      update: {},
+      update: { quartile: source.quartile },
       create: source,
     });
   }
@@ -174,8 +229,8 @@ async function main() {
     where: {
       name_classificationId: { name: 'Sample Journal Scopus', classificationId: scopus.id },
     },
-    update: {},
-    create: { name: 'Sample Journal Scopus', classificationId: scopus.id },
+    update: { quartile: 'Q2' },
+    create: { name: 'Sample Journal Scopus', classificationId: scopus.id, quartile: 'Q2' },
   });
 
   type RuleSeed = {
@@ -224,6 +279,8 @@ async function main() {
       1.8,
     ),
     rule('TEACHING_PRACTICAL', 'Giảng thực hành', ACTIVITY_TYPE.TEACHING, 'tín chỉ', 1),
+    rule('TEACHING_PRACTICAL_PERIOD', 'Giảng thực hành/thực tế theo tiết', ACTIVITY_TYPE.TEACHING, 'tiết', 1),
+    rule('TEACHING_SELF_STUDY_PERIOD', 'Hướng dẫn tự học bắt buộc theo tiết', ACTIVITY_TYPE.TEACHING, 'tiết', 0.3),
     rule(
       'TEACHING_SELF_STUDY',
       'Hướng dẫn tự học bắt buộc',
@@ -269,7 +326,7 @@ async function main() {
         conditions: JSON.stringify({ rate: 0.12, source: 'Phụ lục II' }),
       },
     ),
-    rule('POSTGRAD_MASTER_LECTURE', 'Giảng cao học', ACTIVITY_TYPE.TEACHING, 'tín chỉ', 1.8, {
+    rule('POSTGRAD_MASTER_LECTURE', 'Giảng cao học (theo tiết)', ACTIVITY_TYPE.TEACHING, 'tiết', 1.7, {
       minHours: 1.6,
       maxHours: 1.8,
     }),
@@ -277,7 +334,7 @@ async function main() {
       'POSTGRAD_DOCTORAL_LECTURE',
       'Giảng nghiên cứu sinh',
       ACTIVITY_TYPE.TEACHING,
-      'tín chỉ',
+      'tiết',
       2,
     ),
     rule(
@@ -345,6 +402,27 @@ async function main() {
       30,
     ),
     rule(
+      'POSTGRAD_DOCTORAL_CO_Y1',
+      'Đồng hướng dẫn luận án tiến sĩ năm 1',
+      ACTIVITY_TYPE.TEACHING,
+      'luận án',
+      25,
+    ),
+    rule(
+      'POSTGRAD_DOCTORAL_CO_Y2',
+      'Đồng hướng dẫn luận án tiến sĩ năm 2',
+      ACTIVITY_TYPE.TEACHING,
+      'luận án',
+      25,
+    ),
+    rule(
+      'POSTGRAD_DOCTORAL_CO_Y3',
+      'Đồng hướng dẫn luận án tiến sĩ năm 3/năm bảo vệ',
+      ACTIVITY_TYPE.TEACHING,
+      'luận án',
+      25,
+    ),
+    rule(
       'POSTGRAD_TERM_PAPER',
       'Chấm tiểu luận sau đại học',
       ACTIVITY_TYPE.TEACHING,
@@ -359,57 +437,59 @@ async function main() {
       2,
     ),
 
-    rule(
-      'RESEARCH_ARTICLE_ISI_SCOPUS',
-      'Bài báo ISI/Scopus (tối đa 1.200 giờ)',
-      ACTIVITY_TYPE.RESEARCH,
-      'bài báo',
-      1200,
-      {
-        classificationId: isi.id,
-        maxHours: 1200,
-        priority: 20,
-      },
-    ),
-    rule(
-      'RESEARCH_ARTICLE_ISI_SCOPUS',
-      'Bài báo ISI/Scopus (tối đa 1.200 giờ)',
-      ACTIVITY_TYPE.RESEARCH,
-      'bài báo',
-      1200,
-      {
-        classificationId: scopus.id,
-        maxHours: 1200,
-        priority: 20,
-      },
+    ...(['Q1', 'Q2', 'Q3', 'Q4'] as const).map((quartile) =>
+      rule(
+        `RESEARCH_ARTICLE_WOS_SCOPUS_${quartile}`,
+        `Bài báo WoS/Scopus ${quartile}`,
+        ACTIVITY_TYPE.RESEARCH,
+        'bài báo',
+        { Q1: 1200, Q2: 1100, Q3: 900, Q4: 800 }[quartile],
+        { maxHours: { Q1: 1200, Q2: 1100, Q3: 900, Q4: 800 }[quartile], priority: 30 },
+      ),
     ),
     rule(
       'RESEARCH_ARTICLE_FOREIGN_OTHER',
-      'Bài báo quốc tế ngoài ISI/Scopus (tối đa 900 giờ)',
+      'Bài báo quốc tế ngoài WoS/Scopus tại tạp chí uy tín',
       ACTIVITY_TYPE.RESEARCH,
       'bài báo',
-      900,
-      { maxHours: 900 },
+      650,
+      { maxHours: 650 },
+    ),
+    rule(
+      'RESEARCH_ARTICLE_INTERNATIONAL_ISSN',
+      'Bài báo quốc tế khác có mã ISSN',
+      ACTIVITY_TYPE.RESEARCH,
+      'bài báo',
+      700,
+      { maxHours: 700 },
     ),
     rule(
       'RESEARCH_ARTICLE_VNU_SCOPUS_SECTION',
-      'Chuyên san tạp chí ĐHQGHN đạt chuẩn Scopus (tối đa 900 giờ)',
+      'Chuyên san tạp chí ĐHQGHN đạt chuẩn Scopus',
       ACTIVITY_TYPE.RESEARCH,
       'bài báo',
-      900,
-      { maxHours: 900 },
+      500,
+      { maxHours: 500 },
     ),
     rule(
       'RESEARCH_ARTICLE_DOMESTIC_05',
-      'Bài báo trong nước tối đa 0,5 điểm (tối đa 300 giờ)',
+      'Bài báo trong nước tối đa 0,5 điểm',
       ACTIVITY_TYPE.RESEARCH,
       'bài báo',
       300,
       { maxHours: 300 },
     ),
     rule(
+      'RESEARCH_ARTICLE_DOMESTIC_075',
+      'Bài báo trong nước tối đa 0,75 điểm',
+      ACTIVITY_TYPE.RESEARCH,
+      'bài báo',
+      450,
+      { maxHours: 450 },
+    ),
+    rule(
       'RESEARCH_ARTICLE_DOMESTIC_1',
-      'Bài báo trong nước tối đa 1 điểm (tối đa 600 giờ)',
+      'Bài báo trong nước tối đa 1 điểm',
       ACTIVITY_TYPE.RESEARCH,
       'bài báo',
       600,
@@ -425,19 +505,19 @@ async function main() {
     ),
     rule(
       'RESEARCH_CONFERENCE_INTERNATIONAL_REVIEWED',
-      'Kỷ yếu hội nghị quốc tế có phản biện (tối đa 600 giờ)',
+      'Kỷ yếu hội nghị quốc tế có phản biện',
       ACTIVITY_TYPE.RESEARCH,
       'bài',
-      600,
-      { maxHours: 600 },
+      500,
+      { maxHours: 500 },
     ),
     rule(
       'RESEARCH_CONFERENCE_NATIONAL_ISBN',
-      'Kỷ yếu hội nghị trong nước có ISBN và phản biện (tối đa 450 giờ)',
+      'Kỷ yếu hội nghị trong nước có ISBN và phản biện',
       ACTIVITY_TYPE.RESEARCH,
       'bài',
-      450,
-      { maxHours: 450 },
+      400,
+      { maxHours: 400 },
     ),
     rule(
       'RESEARCH_BOOK_DOMESTIC_MONOGRAPH',
@@ -709,35 +789,8 @@ async function main() {
     ),
   ];
 
-  // Cập nhật các rule mẫu cũ để không còn sót mức Scopus 800 hoặc chuyển giao 600.
-  await prisma.conversion_rules.updateMany({
-    where: {
-      activityType: ACTIVITY_TYPE.RESEARCH,
-      classificationId: isi.id,
-      academicYearId: academicYear.id,
-    },
-    data: {
-      code: 'RESEARCH_ARTICLE_ISI_SCOPUS',
-      label: 'Bài báo ISI/Scopus',
-      unit: 'bài báo',
-      hours: 1200,
-      priority: 20,
-    },
-  });
-  await prisma.conversion_rules.updateMany({
-    where: {
-      activityType: ACTIVITY_TYPE.RESEARCH,
-      classificationId: scopus.id,
-      academicYearId: academicYear.id,
-    },
-    data: {
-      code: 'RESEARCH_ARTICLE_ISI_SCOPUS',
-      label: 'Bài báo ISI/Scopus',
-      unit: 'bài báo',
-      hours: 1200,
-      priority: 20,
-    },
-  });
+  // Không tạo một rule ISI/Scopus chung: 1.1 của quy định mới bắt buộc phải
+  // xác định Q1/Q2/Q3/Q4 trước khi tính giờ.
   await prisma.conversion_rules.updateMany({
     where: { activityType: ACTIVITY_TYPE.KNOWLEDGE_TRANSFER, academicYearId: academicYear.id },
     data: {

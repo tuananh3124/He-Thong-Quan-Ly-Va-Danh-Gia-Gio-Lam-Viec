@@ -9,7 +9,7 @@ export const useAuth = () => {
   const isAdmin = pathname.startsWith('/admin');
 
   const logout = (params?: { message?: string | null }) => {
-    const { message: warningMessage = "You've been signed out. Please log in again." } =
+    const { message: warningMessage = 'Bạn đã đăng xuất. Vui lòng đăng nhập lại.' } =
       params || {};
 
     if (isAdmin) {

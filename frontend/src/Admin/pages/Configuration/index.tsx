@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Button,
   Card,
@@ -22,10 +22,12 @@ import {
   useCreateConversionRule,
   useCreatePublicationClassification,
   useCreatePublicationSource,
+  useUpdatePublicationSource,
   usePublicationClassifications,
   type ConversionRule,
   type AcademicYear,
   type PublicationClassification,
+  type PublicationSource,
 } from '@/services';
 
 const activityOptions = [
@@ -49,6 +51,7 @@ type ClassificationValues = {
 type SourceValues = {
   name: string;
   classificationId: string;
+  quartile?: string;
 };
 
 type RuleValues = {
@@ -65,11 +68,33 @@ type RuleValues = {
   conditions?: string;
 };
 
-export const Configuration = () => {
+const SourceQuartileEditor = ({ source, onUpdated }: { source: PublicationSource; onUpdated: () => void }) => {
+  const updateSource = useUpdatePublicationSource(source.id, {
+    showLoading: false,
+    success: {
+      message: 'Đã cập nhật Quartile',
+      action: onUpdated,
+    },
+  });
+
+  return (
+    <Select
+      allowClear
+      style={{ width: 100 }}
+      placeholder="Q?"
+      value={source.quartile ?? undefined}
+      options={['Q1', 'Q2', 'Q3', 'Q4'].map((value) => ({ value, label: value }))}
+      onChange={(value) => updateSource.fetchData({ data: { quartile: value ?? null } })}
+    />
+  );
+};
+
+export const Configuration = ({ defaultTab = 'years' }: { defaultTab?: 'years' | 'catalog' | 'rules' }) => {
   const [yearForm] = Form.useForm<AcademicYearValues>();
   const [classificationForm] = Form.useForm<ClassificationValues>();
   const [sourceForm] = Form.useForm<SourceValues>();
   const [ruleForm] = Form.useForm<RuleValues>();
+  const [selectedRuleYear, setSelectedRuleYear] = useState<string | undefined>();
 
   const years = useAcademicYears<{
     request: { activeOnly?: boolean };
@@ -78,7 +103,12 @@ export const Configuration = () => {
     params: { activeOnly: false },
   });
   const classifications = usePublicationClassifications();
-  const rules = useConversionRules();
+  const rules = useConversionRules<{
+    request: { activityType?: string; academicYearId?: string };
+    response: ConversionRule[];
+  }>({
+    params: selectedRuleYear ? { academicYearId: selectedRuleYear } : undefined,
+  });
 
   const refresh = () => {
     years.fetchData();
@@ -129,7 +159,7 @@ export const Configuration = () => {
 
   useEffect(() => {
     refresh();
-  }, []);
+  }, [selectedRuleYear]);
 
   return (
     <Page
@@ -137,6 +167,7 @@ export const Configuration = () => {
       actions={<Button icon={<ReloadOutlined />} onClick={refresh} />}
     >
       <Tabs
+        activeKey={defaultTab}
         items={[
           {
             key: 'years',
@@ -218,6 +249,14 @@ export const Configuration = () => {
                         options={(classifications.data ?? []).map((item) => ({ value: item.id, label: item.name }))}
                       />
                     </Form.Item>
+                    <Form.Item name="quartile" label="Quartile">
+                      <Select
+                        allowClear
+                        style={{ width: 120 }}
+                        placeholder="Chọn Q"
+                        options={['Q1', 'Q2', 'Q3', 'Q4'].map((value) => ({ value, label: value }))}
+                      />
+                    </Form.Item>
                     <Button type="primary" htmlType="submit" icon={<PlusOutlined />} loading={createSource.loading}>
                       Thêm
                     </Button>
@@ -237,9 +276,15 @@ export const Configuration = () => {
                   ]}
                   expandable={{
                     expandedRowRender: (record: PublicationClassification) => (
-                      <Typography.Text type="secondary">
-                        {(record.sources ?? []).map((source) => source.name).join(', ') || 'Chưa có nguồn'}
-                      </Typography.Text>
+                      <Space direction="vertical">
+                        {(record.sources ?? []).map((source) => (
+                          <Space key={source.id}>
+                            <Typography.Text>{source.name}</Typography.Text>
+                            <SourceQuartileEditor source={source} onUpdated={refresh} />
+                          </Space>
+                        ))}
+                        {!record.sources?.length ? <Typography.Text type="secondary">Chưa có nguồn</Typography.Text> : null}
+                      </Space>
                     ),
                   }}
                 />
@@ -310,6 +355,19 @@ export const Configuration = () => {
                   loading={rules.loading}
                   dataSource={rules.data ?? []}
                   scroll={{ x: 1100 }}
+                  title={() => (
+                    <Space>
+                      <Typography.Text strong>Lọc theo năm học:</Typography.Text>
+                      <Select
+                        allowClear
+                        value={selectedRuleYear}
+                        placeholder="Tất cả năm học"
+                        style={{ width: 220 }}
+                        options={(years.data ?? []).map((year) => ({ value: year.id, label: year.name }))}
+                        onChange={setSelectedRuleYear}
+                      />
+                    </Space>
+                  )}
                   columns={[
                     { title: 'Mã', dataIndex: 'code' },
                     { title: 'Tên luật', dataIndex: 'label' },

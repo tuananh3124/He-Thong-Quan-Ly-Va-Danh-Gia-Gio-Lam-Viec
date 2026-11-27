@@ -5,22 +5,61 @@ import { nanoid } from 'nanoid';
 import { useAuth, useGlobal, useMessage } from '@/hooks';
 import type { IHttpGenerics, IHttpResponse, IUseHttpProps, UseHttpState } from './types';
 
+const translateMessage = (value: unknown): string => {
+  const text = Array.isArray(value) ? value.join('; ') : String(value ?? '');
+  const translations: Array<[RegExp, string]> = [
+    [/^Internal server error\.?$/i, 'Hệ thống đang gặp lỗi. Vui lòng thử lại sau.'],
+    [/^System upgrade in progress\.?$/i, 'Hệ thống đang được cập nhật. Vui lòng thử lại sau.'],
+    [/^Timed out$/i, 'Thao tác đã hết thời gian chờ.'],
+    [/^An unknown error occurred\.?$/i, 'Đã xảy ra lỗi không xác định.'],
+    [/^Successfully$/i, 'Đã thực hiện thành công.'],
+    [/^Invalid password$/i, 'Mật khẩu không đúng.'],
+    [/^Invalid or expired refresh token$/i, 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'],
+    [/^Invalid refresh token$/i, 'Mã phiên đăng nhập không hợp lệ.'],
+    [/^(?:User not found|Tenant not found)$/i, 'Không tìm thấy thông tin yêu cầu.'],
+    [/^Email is already registered$/i, 'Email này đã được đăng ký.'],
+    [/^Only managers can access this report$/i, 'Chỉ tài khoản quản lý mới được xem báo cáo này.'],
+    [/^Only draft or rejected declarations can be edited$/i, 'Chỉ được sửa bản nháp hoặc bản kê khai bị từ chối.'],
+    [/^Only draft or rejected declarations can be deleted$/i, 'Chỉ được xóa bản nháp hoặc bản kê khai bị từ chối.'],
+    [/^Only submitted declarations can be reviewed$/i, 'Chỉ được xem xét bản kê khai đã gửi.'],
+    [/^A rejection reason is required$/i, 'Vui lòng nhập lý do từ chối.'],
+    [/^The uploaded file is not a valid PDF$/i, 'Tệp tải lên không phải là PDF hợp lệ.'],
+    [/^A PDF evidence file is required$/i, 'Vui lòng chọn tệp PDF minh chứng.'],
+    [/^Evidence can only be changed on draft or rejected declarations$/i, 'Chỉ được thay tệp ở bản nháp hoặc bản kê khai bị từ chối.'],
+    [/^No evidence file is attached$/i, 'Bản kê khai chưa có tệp minh chứng.'],
+    [/^Declaration not found$/i, 'Không tìm thấy bản kê khai.'],
+    [/^Academic year not found$/i, 'Không tìm thấy năm học.'],
+    [/^Publication source not found$/i, 'Không tìm thấy nguồn công bố.'],
+    [/^AI service is not configured$/i, 'Dịch vụ xử lý liên kết chưa được cấu hình.'],
+    [/^Cannot analyze publication URL$/i, 'Không thể lấy thông tin từ liên kết này.'],
+    [/^must be an? email/i, 'Email không hợp lệ.'],
+    [/^.*must be a string/i, 'Giá trị phải là văn bản.'],
+    [/^.*should not be empty/i, 'Trường này không được để trống.'],
+    [/^.*must be a number/i, 'Giá trị phải là số.'],
+    [/^.*must be an integer/i, 'Giá trị phải là số nguyên.'],
+    [/^.*must be one of the following values/i, 'Giá trị được chọn không hợp lệ.'],
+    [/^.*must not be less than/i, 'Giá trị thấp hơn mức cho phép.'],
+    [/^.*must not be greater than/i, 'Giá trị vượt quá mức cho phép.'],
+    [/^must be a numeric id$/i, 'Mã dữ liệu không hợp lệ.'],
+  ];
+  const match = translations.find(([pattern]) => pattern.test(text));
+  return match ? match[1] : text || 'Đã xảy ra lỗi. Vui lòng thử lại.';
+};
+
 const handleHttpError = (
   error: any,
   httpStrategy?: Record<number, () => void>,
 ): { message: string; code: number } => {
   const status = error?.response?.status;
   const errorMap: Record<number, string> = {
-    500: 'Internal server error.',
-    502: 'System upgrade in progress. Please try again later.',
-    504: 'Timed out',
+    500: 'Hệ thống đang gặp lỗi. Vui lòng thử lại sau.',
+    502: 'Hệ thống đang được cập nhật. Vui lòng thử lại sau.',
+    504: 'Thao tác đã hết thời gian chờ.',
   };
 
   const errorMessage =
     errorMap[status] ||
-    error?.response?.data?.meta?.message ||
-    error?.message ||
-    'An unknown error occurred.';
+    translateMessage(error?.response?.data?.meta?.message || error?.message);
 
   if (httpStrategy?.[status]) httpStrategy[status]();
 
@@ -99,7 +138,7 @@ export const useHttp = <T extends IHttpGenerics = IHttpGenerics>({
     if (showLoading) {
       if (useAntdMessage) {
         message.loading({
-          content: 'Loading...',
+          content: 'Đang xử lý...',
           key: loadingKey,
         });
       } else {
@@ -145,7 +184,7 @@ export const useHttp = <T extends IHttpGenerics = IHttpGenerics>({
       if (success.message) {
         const isDefault = success.message === 'default';
         const responseMessage =
-          typeof responseData.data === 'string' ? responseData.data : 'Successfully';
+          typeof responseData.data === 'string' ? translateMessage(responseData.data) : 'Đã thực hiện thành công.';
         const finalMessage = isDefault ? responseMessage : success.message;
         message.success({
           key: loadingKey,
