@@ -82,6 +82,20 @@ const normalizeComparable = (value?: string | null) =>
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 
+const normalizePersonName = (value?: string | null) =>
+  normalizeComparable(value)
+    .replace(/\b(?:gs|pgs|ts|ths|dr|prof)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const personNameMatches = (accountName: string, authorName: string) => {
+  const account = normalizePersonName(accountName);
+  const author = normalizePersonName(authorName);
+  if (!account || !author) return false;
+  if (account === author || author.includes(account)) return true;
+  return account.split(' ').sort().join(' ') === author.split(' ').sort().join(' ');
+};
+
 @Injectable()
 export class DeclarationsService {
   constructor(
@@ -93,7 +107,17 @@ export class DeclarationsService {
     return this.prisma.declarations.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, name: true, email: true, academicTitle: true, staffCategory: true } },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            academicTitle: true,
+            staffCategory: true,
+            department: true,
+            room: true,
+          },
+        },
         academicYear: true,
         source: { include: { classification: true } },
         authors: true,
@@ -129,13 +153,24 @@ export class DeclarationsService {
     }
   }
 
-  private async analyzeEvidence(storagePath: string, originalName: string) {
+  private async assertDeclarationAuthorMatchesUser(userId: string, activityType: string, authors?: CreateDeclarationDto['authors']) {
+    if (activityType !== ACTIVITY_TYPE.RESEARCH) return;
+    const user = await this.prisma.users.findUnique({
+      where: { id: parseId(userId, 'userId') },
+      select: { name: true },
+    });
+    const matched = (authors ?? []).some((author) => personNameMatches(user?.name ?? '', author.authorName));
+    if (!matched) {
+      throw new BadRequestException('Tên tác giả phải trùng với tên tài khoản của người kê khai');
+    }
+  }
+
+  private async analyzeEvidenceBuffer(buffer: Buffer, originalName: string) {
     const serviceUrl = getEnv('AI_SERVICE_URL');
     if (!serviceUrl) return null;
     try {
-      const buffer = await readFile(storagePath);
       const form = new FormData();
-      form.append('file', new Blob([buffer], { type: 'application/pdf' }), originalName);
+      form.append('file', new Blob([new Uint8Array(buffer)], { type: 'application/pdf' }), originalName);
       const response = await axios.post(`${serviceUrl.replace(/\/$/, '')}/analyze`, form, {
         timeout: 120_000,
       });
@@ -144,6 +179,22 @@ export class DeclarationsService {
       // Uploading evidence must remain available when the optional AI service is down.
       return null;
     }
+  }
+
+  private async analyzeEvidence(storagePath: string, originalName: string) {
+    return this.analyzeEvidenceBuffer(await readFile(storagePath), originalName);
+  }
+
+  async analyzeEvidenceFile(file?: Express.Multer.File) {
+    if (!file) throw new BadRequestException('Vui lòng chọn tệp PDF minh chứng');
+    if (file.buffer.subarray(0, 5).toString() !== '%PDF-') {
+      throw new BadRequestException('Tệp tải lên không phải là PDF hợp lệ');
+    }
+    const result = await this.analyzeEvidenceBuffer(file.buffer, file.originalname);
+    if (!result) {
+      throw new BadRequestException('Không thể phân tích PDF. Hãy kiểm tra AI service đang chạy.');
+    }
+    return result;
   }
 
   async metadataFromUrl(url: string) {
@@ -241,8 +292,11 @@ export class DeclarationsService {
     };
   }
 
-  async list(userId: string, role: ROLE_TYPE, status?: string) {
-    const where: any = { status };
+  async list(userId: string, role: ROLE_TYPE, status?: string, academicYearIdValue?: string) {
+    const where: any = {
+      status,
+      academicYearId: academicYearIdValue ? parseId(academicYearIdValue, 'academicYearId') : undefined,
+    };
 
     if (role === ROLE.Manager) {
       if (status === DECLARATION_STATUS.DRAFT) return [];
@@ -273,19 +327,73 @@ export class DeclarationsService {
     return declarations.map(serialize);
   }
 
-  async managerSummary(userId: string, role: ROLE_TYPE) {
+  async managerSummary(userId: string, role: ROLE_TYPE, academicYearIdValue?: string) {
+    let tenantId: bigint | undefined;
     let where: any = {};
     if (role === ROLE.Manager) {
-      const tenantId = await this.managerTenantId(userId);
+      tenantId = await this.managerTenantId(userId);
       where = { user: { tenantId } };
     } else if (role !== ROLE.Admin) {
       throw new ForbiddenException('Only managers can access this report');
     }
 
+    const staffUsers = await this.prisma.users.findMany({
+      where: role === ROLE.Manager ? { tenantId, role: ROLE.Staff } : { role: ROLE.Staff },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        staffCategory: true,
+        academicTitle: true,
+        degree: true,
+        department: true,
+        room: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+    const requestedAcademicYearId = academicYearIdValue
+      ? parseId(academicYearIdValue, 'academicYearId')
+      : undefined;
+    const academicYear = requestedAcademicYearId
+      ? await this.prisma.academic_years.findUnique({
+          where: { id: requestedAcademicYearId },
+          select: { id: true, name: true, startDate: true, endDate: true, isActive: true },
+        })
+      : await this.prisma.academic_years.findFirst({
+          where: { isActive: true },
+          orderBy: { startDate: 'desc' },
+          select: { id: true, name: true, startDate: true, endDate: true, isActive: true },
+        });
+    if (requestedAcademicYearId && !academicYear) {
+      throw new NotFoundException('Không tìm thấy năm học được chọn');
+    }
+    const workingHourNorms = academicYear
+      ? await this.prisma.working_hour_norms.findMany({ where: { academicYearId: academicYear.id } })
+      : [];
+    const targetHoursFor = (staff: (typeof staffUsers)[number]) => {
+      const norm = workingHourNorms.find(
+        (item) => item.academicTitle === (staff.academicTitle ?? '') && item.degree === (staff.degree ?? ''),
+      );
+      return norm?.totalHoursNorm ?? 1760;
+    };
+
     const declarations = await this.prisma.declarations.findMany({
-      where,
+      where: academicYear ? { ...where, academicYearId: academicYear.id } : { ...where, id: BigInt(-1) },
       include: {
-        user: { select: { id: true, name: true, email: true, staffCategory: true, department: true, room: true } },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            academicTitle: true,
+            staffCategory: true,
+            department: true,
+            room: true,
+          },
+        },
+        academicYear: true,
+        source: { include: { classification: true } },
+        authors: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -299,31 +407,49 @@ export class DeclarationsService {
       calculatedHours: declarations.reduce((sum, item) => sum + (item.calculatedHours ?? 0), 0),
     };
 
-    const staffMap = new Map<string, any>();
+    const staffMap = new Map<string, any>(
+      staffUsers.map((staff) => [
+        staff.id.toString(),
+        {
+          id: staff.id.toString(),
+          name: staff.name,
+          email: staff.email,
+          staffCategory: staff.staffCategory,
+          department: staff.department,
+          room: staff.room,
+          targetHours: targetHoursFor(staff),
+          declarationCount: 0,
+          calculatedHours: 0,
+          approvedHours: 0,
+          pendingHours: 0,
+          submittedCount: 0,
+          approvedCount: 0,
+          rejectedCount: 0,
+          remainingHours: targetHoursFor(staff),
+          progressPercent: 0,
+          needsAttention: ['Chưa có bản kê khai'],
+          declarations: [],
+        },
+      ]),
+    );
     const activityMap = new Map<string, any>();
     const departmentMap = new Map<string, any>();
     const roomMap = new Map<string, any>();
     for (const item of declarations) {
       const staffId = item.user.id.toString();
-      const staff = staffMap.get(staffId) ?? {
-        id: staffId,
-        name: item.user.name,
-        email: item.user.email,
-        staffCategory: item.user.staffCategory,
-        department: item.user.department,
-        room: item.user.room,
-        declarationCount: 0,
-        calculatedHours: 0,
-        submittedCount: 0,
-        approvedCount: 0,
-        rejectedCount: 0,
-      };
+      const staff = staffMap.get(staffId);
+      if (!staff) continue;
       staff.declarationCount += 1;
-      staff.calculatedHours += item.calculatedHours ?? 0;
+      const calculatedHours = item.calculatedHours ?? 0;
+      staff.calculatedHours += calculatedHours;
+      staff.declarations.push(serialize(item));
       if (item.status === DECLARATION_STATUS.SUBMITTED) staff.submittedCount += 1;
-      if (item.status === DECLARATION_STATUS.APPROVED) staff.approvedCount += 1;
+      if (item.status === DECLARATION_STATUS.APPROVED) {
+        staff.approvedCount += 1;
+        staff.approvedHours += calculatedHours;
+      }
+      if (item.status === DECLARATION_STATUS.SUBMITTED) staff.pendingHours += calculatedHours;
       if (item.status === DECLARATION_STATUS.REJECTED) staff.rejectedCount += 1;
-      staffMap.set(staffId, staff);
 
       const department = item.user.department || 'Chưa phân khoa';
       const departmentItem = departmentMap.get(department) ?? {
@@ -355,7 +481,28 @@ export class DeclarationsService {
       activityMap.set(item.activityType, activity);
     }
 
+    for (const staff of staffMap.values()) {
+      staff.remainingHours = Math.max(staff.targetHours - staff.approvedHours, 0);
+      staff.progressPercent = staff.targetHours
+        ? Math.min(Math.round((staff.approvedHours / staff.targetHours) * 100), 100)
+        : 0;
+      staff.needsAttention = [];
+      if (staff.remainingHours > 0) staff.needsAttention.push(`Còn thiếu ${staff.remainingHours.toFixed(2)} giờ`);
+      if (staff.submittedCount > 0) staff.needsAttention.push(`${staff.submittedCount} bản kê khai đang chờ duyệt`);
+      if (staff.rejectedCount > 0) staff.needsAttention.push(`${staff.rejectedCount} bản kê khai cần bổ sung`);
+      if (staff.declarationCount === 0) staff.needsAttention.push('Chưa có bản kê khai');
+    }
+
     return {
+      academicYear: academicYear
+        ? {
+            id: academicYear.id.toString(),
+            name: academicYear.name,
+            startDate: academicYear.startDate,
+            endDate: academicYear.endDate,
+            isActive: academicYear.isActive,
+          }
+        : null,
       totals: statuses,
       staff: [...staffMap.values()].sort((a, b) => b.calculatedHours - a.calculatedHours),
       activities: [...activityMap.values()].sort((a, b) => b.calculatedHours - a.calculatedHours),
@@ -417,6 +564,7 @@ export class DeclarationsService {
     const enriched = await this.enrichFromUrl(dto);
     dto = enriched.dto;
     await this.assertActivityAllowed(userId, dto.activityType);
+    await this.assertDeclarationAuthorMatchesUser(userId, dto.activityType, dto.authors);
     this.validateAuthorAllocations(dto.authors);
     const academicYearId = parseId(dto.academicYearId, 'academicYearId');
     const sourceId = dto.sourceId
@@ -482,6 +630,7 @@ export class DeclarationsService {
     const enriched = await this.enrichFromUrl(dto);
     dto = enriched.dto;
     await this.assertActivityAllowed(userId, dto.activityType);
+    await this.assertDeclarationAuthorMatchesUser(userId, dto.activityType, dto.authors);
     if (![DECLARATION_STATUS.DRAFT, DECLARATION_STATUS.REJECTED].includes(declaration.status as any)) {
       throw new BadRequestException('Only draft or rejected declarations can be edited');
     }

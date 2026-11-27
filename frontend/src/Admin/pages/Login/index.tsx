@@ -39,8 +39,10 @@ export const AdminLogin = () => {
   return (
     <Flex vertical align="center" gap="large" style={{ width: mobile ? '100%' : '50%' }}>
       <div style={{ textAlign: 'center' }}>
-        <Title level={2}>Cổng quản trị</Title>
-        <Text type="secondary">Đăng nhập để quản lý quy định và phê duyệt kê khai</Text>
+        <Title level={2} style={{ marginBottom: 8, textAlign: 'center' }}>
+          Hệ thống quản lý giờ làm việc tiêu chuẩn
+        </Title>
+        <Text type="secondary">Cổng quản trị · Đăng nhập để quản lý hệ thống</Text>
       </div>
 
       <Form form={form} layout="vertical" onFinish={handleSubmit} style={{ width: '100%' }}>

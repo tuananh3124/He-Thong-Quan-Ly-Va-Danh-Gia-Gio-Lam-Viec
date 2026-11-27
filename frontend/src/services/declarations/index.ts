@@ -137,6 +137,7 @@ export type ConversionRule = {
 };
 
 export type ManagerSummary = {
+  academicYear: AcademicYear | null;
   totals: {
     total: number;
     draft: number;
@@ -150,13 +151,27 @@ export type ManagerSummary = {
     name: string;
     email: string;
     staffCategory?: string | null;
+    targetHours: number;
     declarationCount: number;
     calculatedHours: number;
+    approvedHours: number;
+    pendingHours: number;
     submittedCount: number;
     approvedCount: number;
     rejectedCount: number;
+    remainingHours: number;
+    progressPercent: number;
+    needsAttention: string[];
     department?: string | null;
     room?: string | null;
+    declarations: Array<{
+      id: string;
+      name: string;
+      activityType: string;
+      status: string;
+      calculatedHours: number | null;
+      updatedAt?: string;
+    }>;
   }>;
   departments: Array<{ department: string; declarationCount: number; calculatedHours: number }>;
   rooms: Array<{ room: string; declarationCount: number; calculatedHours: number }>;
@@ -175,7 +190,7 @@ export type PublicationClassification = {
 };
 
 export const useDeclarations = <
-  T extends IHttpGenerics = { request: { status?: string }; response: Declaration[] },
+  T extends IHttpGenerics = { request: { status?: string; academicYearId?: string }; response: Declaration[] },
 >(
   params?: IHttpType<T>,
 ) =>
@@ -303,7 +318,7 @@ export const usePublicationSources = <
   });
 
 export const useConversionRules = <
-  T extends IHttpGenerics = { request: { activityType?: string }; response: ConversionRule[] },
+  T extends IHttpGenerics = { request: { activityType?: string; academicYearId?: string }; response: ConversionRule[] },
 >(
   params?: IHttpType<T>,
 ) =>
@@ -314,7 +329,7 @@ export const useConversionRules = <
   });
 
 export const useManagerSummary = <
-  T extends IHttpGenerics = { request: undefined; response: ManagerSummary },
+  T extends IHttpGenerics = { request: { academicYearId?: string }; response: ManagerSummary },
 >(params?: IHttpType<T>) =>
   useHttp<T>({
     url: '/declarations/manager-summary',

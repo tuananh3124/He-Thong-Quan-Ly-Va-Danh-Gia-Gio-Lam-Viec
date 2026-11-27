@@ -58,7 +58,7 @@ const statusColor: Record<AssignmentResult['status'], string> = {
 export const ManagerTeachingAssignments = () => {
   const { apiBaseUrl, token } = useGlobal();
   const toast = useMessage();
-  const academicYears = useAcademicYears();
+  const academicYears = useAcademicYears({ params: { activeOnly: false } });
   const [academicYearId, setAcademicYearId] = useState<string>();
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [loading, setLoading] = useState(false);

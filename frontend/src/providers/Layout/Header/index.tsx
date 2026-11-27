@@ -45,10 +45,12 @@ export const Header = () => {
             ? 'Quản trị viên'
             : user?.role === ROLE.Manager
               ? 'Quản lý'
-              : user?.staffCategory === STAFF_CATEGORY.Researcher
-                ? 'Nghiên cứu viên'
-                : user?.staffCategory === STAFF_CATEGORY.Lecturer
-                  ? 'Giảng viên'
+              : user?.staffCategory === STAFF_CATEGORY.LecturerResearcher
+                ? 'Giảng viên & nghiên cứu viên'
+                : user?.staffCategory === STAFF_CATEGORY.Researcher
+                  ? 'Nghiên cứu viên'
+                  : user?.staffCategory === STAFF_CATEGORY.Lecturer
+                    ? 'Giảng viên'
                   : 'Cán bộ'}
         </Tag>
         <Typography.Text type="secondary" ellipsis style={{ maxWidth: 180 }}>

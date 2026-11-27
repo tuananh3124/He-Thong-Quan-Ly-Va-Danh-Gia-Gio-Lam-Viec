@@ -19,8 +19,11 @@ import {
   FileTextOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { ROLE } from '@projectname/shared';
 import { Page } from '@/components/ui';
+import { useGlobal } from '@/hooks';
 import { useAcademicYears, useDeclarations } from '@/services';
+import { ManagerDashboard } from '@/pages/ManagerDashboard';
 
 const statusLabel: Record<string, string> = {
   DRAFT: 'Bản nháp',
@@ -30,8 +33,10 @@ const statusLabel: Record<string, string> = {
 };
 
 const ANNUAL_TARGET_HOURS = 1760;
+const roundHours = (value: number) => Number(value.toFixed(2));
+const formatHours = (value: number | null | undefined) => roundHours(value ?? 0).toString();
 
-export const Dashboard = () => {
+const StaffDashboard = () => {
   const navigate = useNavigate();
   const declarations = useDeclarations();
   const academicYears = useAcademicYears();
@@ -55,16 +60,20 @@ export const Dashboard = () => {
   }, []);
 
   const items = declarations.data ?? [];
-  const approvedHours = items
-    .filter((item) => item.status === 'APPROVED')
-    .reduce((total, item) => total + (item.calculatedHours ?? 0), 0);
-  const pendingHours = items
-    .filter((item) => item.status === 'SUBMITTED')
-    .reduce((total, item) => total + (item.calculatedHours ?? 0), 0);
+  const approvedHours = roundHours(
+    items
+      .filter((item) => item.status === 'APPROVED')
+      .reduce((total, item) => total + (item.calculatedHours ?? 0), 0),
+  );
+  const pendingHours = roundHours(
+    items
+      .filter((item) => item.status === 'SUBMITTED')
+      .reduce((total, item) => total + (item.calculatedHours ?? 0), 0),
+  );
   const submittedCount = items.filter((item) => item.status === 'SUBMITTED').length;
   const approvedCount = items.filter((item) => item.status === 'APPROVED').length;
   const progress = items.length ? Math.round((approvedCount / items.length) * 100) : 0;
-  const remainingHours = Math.max(ANNUAL_TARGET_HOURS - approvedHours, 0);
+  const remainingHours = roundHours(Math.max(ANNUAL_TARGET_HOURS - approvedHours, 0));
   const hoursProgress = Math.min(
     Math.round((approvedHours / ANNUAL_TARGET_HOURS) * 100),
     100,
@@ -161,7 +170,7 @@ export const Dashboard = () => {
             </Flex>
             <Progress percent={hoursProgress} strokeColor="#1769aa" />
             <Typography.Text type="secondary">
-              Đang chờ duyệt: {pendingHours.toFixed(2)} giờ. Định mức tổng: {ANNUAL_TARGET_HOURS} giờ/năm học.
+              Đang chờ duyệt: {formatHours(pendingHours)} giờ. Định mức tổng: {ANNUAL_TARGET_HOURS} giờ/năm học.
             </Typography.Text>
           </Flex>
         </Card>
@@ -184,7 +193,7 @@ export const Dashboard = () => {
                     <List.Item>
                       <List.Item.Meta title={item.name} description={item.activityType} />
                       <Flex align="center" gap="middle">
-                        <Typography.Text strong>{item.calculatedHours ?? 0} giờ</Typography.Text>
+                        <Typography.Text strong>{formatHours(item.calculatedHours)} giờ</Typography.Text>
                         <Tag
                           color={
                             item.status === 'APPROVED'
@@ -219,4 +228,9 @@ export const Dashboard = () => {
       </Page>
     </div>
   );
+};
+
+export const Dashboard = () => {
+  const { role } = useGlobal();
+  return role === ROLE.Manager ? <ManagerDashboard /> : <StaffDashboard />;
 };
